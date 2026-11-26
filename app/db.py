@@ -142,6 +142,16 @@ def seed_demo_data(database_path: str | Path, hash_password_fn: Any) -> bool:
             (
                 aoife_id,
                 cohort,
+                "Draft timetable shows duplicate Tuesday lab slot",
+                "Timetables",
+                "The draft calendar lists two overlapping lab rooms for Tuesday afternoon; submitting this item as a separate New entry for deletion demo testing.",
+                "New",
+                now,
+                now,
+            ),
+            (
+                aoife_id,
+                cohort,
                 "Clarify IEEE referencing expectations for CA brief",
                 "Assessments",
                 "Several classmates are unsure whether RFC documents and OWASP cheat sheets should be cited with access dates in the IEEE reference list.",
@@ -233,3 +243,13 @@ def init_db_and_seed(app: Flask, hash_password_fn: Any) -> None:
     db_path = app.config["DATABASE_PATH"]
     run_migrations(db_path)
     seed_demo_data(db_path, hash_password_fn)
+
+
+def reset_and_seed_db(database_path: str | Path, hash_password_fn: Any) -> list[str]:
+    """Recreate a fresh local database from SQL migrations and insert fictional demo data."""
+    db_path = Path(database_path)
+    if db_path.exists():
+        db_path.unlink()
+    applied = run_migrations(db_path)
+    seed_demo_data(db_path, hash_password_fn)
+    return applied

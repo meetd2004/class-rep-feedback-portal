@@ -8,7 +8,7 @@ from flask import Flask, Response, render_template
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
 from app.config import Config
-from app.db import close_db, init_db_and_seed
+from app.db import close_db, init_db_and_seed, reset_and_seed_db
 from app.security import hash_password, load_current_user
 
 csrf = CSRFProtect()
@@ -115,6 +115,16 @@ def create_app(test_config: dict[str, Any] | type[Config] | None = None) -> Flas
         """Apply SQL migrations and seed fictional demo accounts."""
         init_db_and_seed(app, hash_password)
         print("Database migrated and fictional demo data initialized.")
+
+    @app.cli.command("reset-demo-db")
+    def reset_demo_db_command() -> None:
+        """Rebuild a fresh local database and reseed fictional demo data (non-production only)."""
+        import os
+
+        if os.environ.get("FLASK_ENV", "development").lower() == "production":
+            raise RuntimeError("reset-demo-db is disabled when FLASK_ENV=production.")
+        applied = reset_and_seed_db(app.config["DATABASE_PATH"], hash_password)
+        print(f"Fresh database created (migrations: {', '.join(applied)}) with fictional demo data.")
 
     if not app.config.get("TESTING", False):
         init_db_and_seed(app, hash_password)

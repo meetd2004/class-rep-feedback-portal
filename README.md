@@ -61,10 +61,13 @@ Class_Rep_Feedback/
 ├── run.py                        # Local entry point (binds 127.0.0.1:5000, debug=False)
 ├── migrations/
 │   └── 001_initial_schema.sql    # Users, Feedback, Responses tables, indexes, FK & CHECK constraints
+├── docs/
+│   └── DESIGN_AND_THREAT_MODEL.md# ERD, DFD with trust boundaries, misuse cases & SR traceability
 ├── app/
 │   ├── __init__.py               # Flask app factory, CSRFProtect, security headers, error handlers
 │   ├── config.py                 # Environment configuration and domain allow-lists / transitions
 │   ├── db.py                     # Parameterised SQLite connection helper, migration runner, fictional seeds
+│   ├── models.py                 # Typed domain models for User, Feedback, and Response entities
 │   ├── security.py               # Argon2id hashing, RBAC/ownership guards, server-side validators
 │   ├── routes/
 │   │   ├── __init__.py           # Blueprint registration
@@ -84,6 +87,7 @@ Class_Rep_Feedback/
 │       └── js/app.js             # CSP-compliant delete confirm and character counter
 └── tests/
     ├── conftest.py               # Isolated temp SQLite fixtures & CSRF helpers
+    ├── test_database_schema.py   # Fresh migration, CHECK constraints, and repeatable demo seed reset
     ├── test_auth_and_csrf.py     # Hashing, role redirects, session flags, headers, CSRF rejection
     ├── test_student_crud.py      # CRUD lifecycle, validation, status locks, cascade deletion
     ├── test_access_control.py    # Auth redirects, IDOR checks, RBAC, cohort isolation
@@ -120,7 +124,7 @@ Class_Rep_Feedback/
    On first startup, the app automatically applies `migrations/001_initial_schema.sql` to `instance/feedback_portal.db` and seeds the fictional Group B demo accounts and feedback items.
 6. Open `http://127.0.0.1:5000` in your browser.
 
-*(To re-initialize or verify migrations manually via Flask CLI: `flask --app run init-db`.)*
+*(To initialize or reset a fresh local demo database manually via Flask CLI: `flask --app run init-db` or `flask --app run reset-demo-db`.)*
 
 ---
 
