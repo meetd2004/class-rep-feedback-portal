@@ -1,5 +1,49 @@
-/* CSP-compliant progressive enhancement for confirmations, counters, and password toggles. */
+/* CSP-compliant progressive enhancement for intro Lottie splash, confirmations, counters, and password toggles. */
 document.addEventListener("DOMContentLoaded", () => {
+    const splashEl = document.getElementById("intro-splash");
+    if (splashEl) {
+        const lottieContainer = document.getElementById("lottie-intro");
+        const skipBtn = document.getElementById("skip-splash");
+        const lottiePath = splashEl.getAttribute("data-lottie-path");
+        let dismissed = false;
+
+        const dismissSplash = () => {
+            if (dismissed) {
+                return;
+            }
+            dismissed = true;
+            splashEl.classList.add("splash-hidden");
+            window.setTimeout(() => {
+                splashEl.hidden = true;
+            }, 420);
+        };
+
+        if (skipBtn) {
+            skipBtn.addEventListener("click", dismissSplash);
+        }
+
+        const prefersReduced =
+            window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        if (prefersReduced) {
+            dismissSplash();
+        } else {
+            if (window.lottie && lottieContainer && lottiePath) {
+                const anim = window.lottie.loadAnimation({
+                    container: lottieContainer,
+                    renderer: "svg",
+                    loop: false,
+                    autoplay: true,
+                    path: lottiePath,
+                });
+                anim.addEventListener("complete", () => {
+                    window.setTimeout(dismissSplash, 220);
+                });
+            }
+            window.setTimeout(dismissSplash, 1900);
+        }
+    }
+
     document.querySelectorAll("form[data-confirm-message]").forEach((form) => {
         form.addEventListener("submit", (event) => {
             const message = form.getAttribute("data-confirm-message") || "Are you sure?";
