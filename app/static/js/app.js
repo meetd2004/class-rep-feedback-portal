@@ -1,4 +1,4 @@
-/* CSP-compliant progressive enhancement for delete confirmation and character counters. */
+/* CSP-compliant progressive enhancement for confirmations, counters, and password toggles. */
 document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("form[data-confirm-message]").forEach((form) => {
         form.addEventListener("submit", (event) => {
@@ -6,6 +6,20 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!window.confirm(message)) {
                 event.preventDefault();
             }
+        });
+    });
+
+    document.querySelectorAll("button[data-toggle-password]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const targetId = button.getAttribute("data-toggle-password");
+            const input = targetId ? document.getElementById(targetId) : null;
+            if (!input) {
+                return;
+            }
+            const showing = input.type === "text";
+            input.type = showing ? "password" : "text";
+            button.textContent = showing ? "Show" : "Hide";
+            button.setAttribute("aria-label", showing ? "Show password" : "Hide password");
         });
     });
 

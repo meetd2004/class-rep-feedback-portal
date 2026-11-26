@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import secrets
 import sqlite3
+import time
 from functools import wraps
 from typing import Callable, TypeVar
 
@@ -11,6 +13,10 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from flask import abort, current_app, flash, g, redirect, session, url_for
 
 from app.db import get_db
+
+SESSION_IDLE_TIMEOUT_SECONDS = 1800  # 30-minute idle timeout
+LOGIN_WINDOW_SECONDS = 300  # 5-minute sliding rate-limit window
+MAX_FAILED_LOGINS = 5
 
 F = TypeVar("F", bound=Callable[..., object])
 
@@ -59,10 +65,64 @@ def authenticate_user(email: str, password: str) -> sqlite3.Row | None:
     return user
 
 
+def _attempt_store() -> dict[str, list[float]]:
+    """Return the per-app failed-login attempt store."""
+    store = current_app.extensions.setdefault("login_attempts", {})
+    return store  # type: ignore[return-value]
+
+
+def is_login_rate_limited(identifier: str, remote_addr: str) -> bool:
+    """Return True when failed login attempts exceed the threshold in the sliding window."""
+    key = f"{remote_addr}|{identifier.strip().lower()}"
+    now = time.time()
+    store = _attempt_store()
+    recent = [ts for ts in store.get(key, []) if now - ts < LOGIN_WINDOW_SECONDS]
+    if recent:
+        store[key] = recent
+    else:
+        store.pop(key, None)
+    return len(recent) >= MAX_FAILED_LOGINS
+
+
+def record_failed_login(identifier: str, remote_addr: str) -> None:
+    """Record a failed login timestamp for throttling."""
+    key = f"{remote_addr}|{identifier.strip().lower()}"
+    now = time.time()
+    store = _attempt_store()
+    recent = [ts for ts in store.get(key, []) if now - ts < LOGIN_WINDOW_SECONDS]
+    recent.append(now)
+    store[key] = recent
+
+
+def clear_failed_logins(identifier: str, remote_addr: str) -> None:
+    """Clear recorded failed login attempts upon successful sign-in."""
+    key = f"{remote_addr}|{identifier.strip().lower()}"
+    _attempt_store().pop(key, None)
+
+
+def establish_user_session(user: sqlite3.Row) -> None:
+    """Rotate and populate a clean server-signed session after authentication."""
+    now = int(time.time())
+    session.clear()
+    session["user_id"] = user["id"]
+    session["role"] = user["role"]
+    session["session_id"] = secrets.token_urlsafe(16)
+    session["login_at"] = now
+    session["last_seen_at"] = now
+    session.permanent = True
+
+
 def load_current_user() -> None:
-    """Load the authenticated user from the server-signed session into flask.g."""
+    """Load the authenticated user and enforce session integrity and idle timeout."""
     user_id = session.get("user_id")
     if user_id is None:
+        g.user = None
+        return
+
+    now = int(time.time())
+    last_seen = session.get("last_seen_at")
+    if isinstance(last_seen, (int, float)) and (now - int(last_seen)) > SESSION_IDLE_TIMEOUT_SECONDS:
+        session.clear()
         g.user = None
         return
 
@@ -72,11 +132,12 @@ def load_current_user() -> None:
         (user_id,),
     ).fetchone()
 
-    if user is None:
+    if user is None or (session.get("role") is not None and session.get("role") != user["role"]):
         session.clear()
         g.user = None
         return
 
+    session["last_seen_at"] = now
     g.user = user
 
 

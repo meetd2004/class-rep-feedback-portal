@@ -121,12 +121,20 @@ a:hover {
     color: #cbd5e1;
     font-weight: 500;
     font-size: 0.9rem;
-    transition: color 0.15s ease;
+    padding: 0.35rem 0.65rem;
+    border-radius: 7px;
+    transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .nav-link:hover {
     color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
     text-decoration: none;
+}
+
+.nav-link.active {
+    color: #ffffff;
+    background: rgba(59, 130, 246, 0.25);
 }
 
 .user-chip {
@@ -134,9 +142,22 @@ a:hover {
     align-items: center;
     gap: 0.45rem;
     background: rgba(255, 255, 255, 0.08);
-    padding: 0.32rem 0.7rem;
+    padding: 0.28rem 0.7rem 0.28rem 0.35rem;
     border-radius: 999px;
     font-size: 0.85rem;
+}
+
+.user-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.35);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
 }
 
 .main-content {
@@ -236,6 +257,7 @@ h2 {
 .stat-card {
     background: var(--surface);
     border: 1px solid var(--border);
+    border-top: 3px solid var(--primary);
     border-radius: var(--radius);
     padding: 1.1rem 1.25rem;
     box-shadow: var(--shadow);
@@ -270,7 +292,49 @@ h2 {
 .auth-card {
     width: 100%;
     max-width: 440px;
-    padding: 2rem;
+    padding: 2.15rem;
+    border-top: 4px solid var(--primary);
+}
+
+.auth-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: #eff6ff;
+    color: var(--primary);
+    margin-bottom: 1rem;
+}
+
+.password-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-field input {
+    padding-right: 4.2rem;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.25rem 0.45rem;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.password-toggle:hover {
+    color: var(--text);
+    background: #f1f5f9;
 }
 
 .stack-form {
@@ -623,6 +687,62 @@ textarea:focus {
     gap: 0.5rem;
     align-items: center;
     flex-wrap: wrap;
+}
+
+.status-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-top: 1.15rem;
+    padding: 0.85rem 1rem;
+    background: var(--surface-subtle);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.step-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.step-done {
+    color: var(--text);
+}
+
+.step-done .step-dot {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+.step-current .step-dot {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.step-line {
+    flex: 1;
+    height: 2px;
+    background: #cbd5e1;
+    border-radius: 2px;
+}
+
+.step-line-active {
+    background: var(--primary);
 }
 
 .feedback-body {

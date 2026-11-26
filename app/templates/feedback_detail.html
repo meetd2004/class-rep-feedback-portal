@@ -50,6 +50,23 @@
         {% endif %}
     </div>
 
+    <div class="status-stepper" aria-label="Submission Progress">
+        <div class="step {{ 'step-done' if feedback.status in ('New', 'In Review', 'Resolved') else '' }} {{ 'step-current' if feedback.status == 'New' else '' }}">
+            <span class="step-dot">1</span>
+            <span>New</span>
+        </div>
+        <div class="step-line {{ 'step-line-active' if feedback.status in ('In Review', 'Resolved') else '' }}"></div>
+        <div class="step {{ 'step-done' if feedback.status in ('In Review', 'Resolved') else '' }} {{ 'step-current' if feedback.status == 'In Review' else '' }}">
+            <span class="step-dot">2</span>
+            <span>In Review</span>
+        </div>
+        <div class="step-line {{ 'step-line-active' if feedback.status == 'Resolved' else '' }}"></div>
+        <div class="step {{ 'step-done' if feedback.status == 'Resolved' else '' }} {{ 'step-current' if feedback.status == 'Resolved' else '' }}">
+            <span class="step-dot">3</span>
+            <span>Resolved</span>
+        </div>
+    </div>
+
     <div class="feedback-body">{{ feedback.description }}</div>
 </article>
 

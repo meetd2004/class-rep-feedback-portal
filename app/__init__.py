@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Flask, Response, render_template
+from flask import Flask, Response, g, render_template, request
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
 from app.config import Config
@@ -48,6 +48,9 @@ def create_app(test_config: dict[str, Any] | type[Config] | None = None) -> Flas
             "frame-ancestors 'none'; "
             "base-uri 'self'"
         )
+        if g.get("user") is not None or request.endpoint == "auth.login":
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
         return response
 
     @app.errorhandler(CSRFError)

@@ -104,3 +104,54 @@ def test_logout_clears_session(client) -> None:
     after_logout = client.get("/student/dashboard", follow_redirects=False)
     assert after_logout.status_code == 302
     assert after_logout.headers["Location"].endswith("/login")
+
+
+def test_authenticated_users_redirect_from_root_and_login_by_role(client) -> None:
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    for path in ("/", "/login"):
+        resp = client.get(path, follow_redirects=False)
+        assert resp.status_code == 302
+        assert resp.headers["Location"].endswith("/student/dashboard")
+
+    dash = client.get("/student/dashboard")
+    assert "no-store" in dash.headers.get("Cache-Control", "")
+
+
+def test_get_logout_is_rejected(client) -> None:
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    assert client.get("/logout").status_code == 405
+
+
+def test_idle_session_timeout_invalidates_session(client) -> None:
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    with client.session_transaction() as sess:
+        sess["last_seen_at"] = 1  # Force expired idle timestamp
+
+    resp = client.get("/student/dashboard", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/login")
+
+
+def test_login_rate_limiting_blocks_excessive_failed_attempts(client) -> None:
+    token = extract_csrf_token(client.get("/login").get_data(as_text=True))
+    for _ in range(5):
+        resp = client.post(
+            "/login",
+            data={
+                "csrf_token": token,
+                "email": "aoife.brennan@nci-demo.example",
+                "password": "WrongPassword123",
+            },
+        )
+        assert resp.status_code == 200
+
+    throttled = client.post(
+        "/login",
+        data={
+            "csrf_token": token,
+            "email": "aoife.brennan@nci-demo.example",
+            "password": "StudentDemo!2026",
+        },
+    )
+    assert throttled.status_code == 429
+    assert "Too many failed sign-in attempts" in throttled.get_data(as_text=True)
