@@ -231,6 +231,11 @@ def get_authorized_feedback(
     return feedback
 
 
+def _normalize_text(value: str) -> str:
+    """Strip NUL bytes, normalise CRLF newlines, and trim outer whitespace."""
+    return value.replace("\x00", "").replace("\r\n", "\n").strip()
+
+
 def validate_feedback_input(
     title: str,
     category: str,
@@ -240,9 +245,9 @@ def validate_feedback_input(
     """Validate and normalise feedback submission fields on the server."""
     categories = allowed_categories or current_app.config["ALLOWED_CATEGORIES"]
     cleaned = {
-        "title": title.strip(),
-        "category": category.strip(),
-        "description": description.strip(),
+        "title": _normalize_text(title),
+        "category": _normalize_text(category),
+        "description": _normalize_text(description),
     }
     errors: dict[str, str] = {}
 
@@ -260,7 +265,7 @@ def validate_feedback_input(
 
 def validate_response_input(message: str) -> tuple[str, str | None]:
     """Validate class rep response text on the server."""
-    cleaned = message.strip()
+    cleaned = _normalize_text(message)
     if len(cleaned) < 5 or len(cleaned) > 1500:
         return cleaned, "Response must be between 5 and 1500 characters."
     return cleaned, None

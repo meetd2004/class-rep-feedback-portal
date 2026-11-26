@@ -164,3 +164,109 @@ def test_deleting_feedback_cascades_any_child_responses(app) -> None:
         conn.close()
 
     assert remaining == 0
+
+
+def test_student_cannot_edit_or_delete_resolved_feedback(app, client) -> None:
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    conn = connect_sqlite(app.config["DATABASE_PATH"])
+    try:
+        resolved = conn.execute(
+            "SELECT id FROM feedback WHERE status = 'Resolved' AND author_id = 1;"
+        ).fetchone()
+    finally:
+        conn.close()
+    assert resolved is not None
+    fid = resolved["id"]
+
+    assert client.get(f"/feedback/{fid}/edit").status_code == 403
+    token = extract_csrf_token(client.get("/student/dashboard").get_data(as_text=True))
+    assert (
+        client.post(
+            f"/feedback/{fid}/edit",
+            data={
+                "csrf_token": token,
+                "title": "Post resolution edit",
+                "category": "Learning Resources",
+                "description": "Attempting to modify a resolved submission.",
+            },
+        ).status_code
+        == 403
+    )
+    assert client.post(f"/feedback/{fid}/delete", data={"csrf_token": token}).status_code == 403
+
+
+def test_server_validation_rejects_excessive_lengths_and_whitespace(app, client) -> None:
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    token = extract_csrf_token(client.get("/feedback/new").get_data(as_text=True))
+
+    oversized = client.post(
+        "/feedback/new",
+        data={
+            "csrf_token": token,
+            "title": "A" * 121,
+            "category": "Lectures",
+            "description": "B" * 2001,
+        },
+    )
+    assert oversized.status_code == 200
+    html = oversized.get_data(as_text=True)
+    assert "Title must be between 5 and 120 characters." in html
+    assert "Description must be between 15 and 2000 characters." in html
+
+    whitespace_only = client.post(
+        "/feedback/new",
+        data={
+            "csrf_token": token,
+            "title": "     ",
+            "category": "Lectures",
+            "description": "               \r\n   ",
+        },
+    )
+    assert whitespace_only.status_code == 200
+    ws_html = whitespace_only.get_data(as_text=True)
+    assert "Title must be between 5 and 120 characters." in ws_html
+    assert "Description must be between 15 and 2000 characters." in ws_html
+
+
+def test_get_delete_rejected_and_missing_feedback_returns_404(client) -> None:
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    assert client.get("/feedback/1/delete").status_code == 405
+    assert client.get("/feedback/99999").status_code == 404
+    assert client.get("/feedback/99999/edit").status_code == 404
+
+
+def test_two_students_maintain_independent_crud_workflows(app, client) -> None:
+    # Student B (Ciaran) can create, edit, and delete his own New feedback without seeing Aoife's items
+    login_as(client, "ciaran.byrne@nci-demo.example", "StudentDemo!2026")
+    token = extract_csrf_token(client.get("/feedback/new").get_data(as_text=True))
+    res = client.post(
+        "/feedback/new",
+        data={
+            "csrf_token": token,
+            "title": "Ciaran independent feedback",
+            "category": "Timetables",
+            "description": "Verifying Student B CRUD operates cleanly and independently.",
+        },
+        follow_redirects=True,
+    )
+    assert res.status_code == 200
+    assert "Ciaran independent feedback" in res.get_data(as_text=True)
+
+    conn = connect_sqlite(app.config["DATABASE_PATH"])
+    try:
+        row = conn.execute(
+            "SELECT id FROM feedback WHERE title = ?;", ("Ciaran independent feedback",)
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row is not None
+    fid = row["id"]
+
+    del_token = extract_csrf_token(client.get(f"/feedback/{fid}").get_data(as_text=True))
+    del_res = client.post(
+        f"/feedback/{fid}/delete",
+        data={"csrf_token": del_token},
+        follow_redirects=True,
+    )
+    assert del_res.status_code == 200
+    assert "Feedback submission deleted." in del_res.get_data(as_text=True)

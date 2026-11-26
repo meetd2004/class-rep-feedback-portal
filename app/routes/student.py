@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from app.db import get_db, utc_now_iso
 from app.security import (
@@ -155,7 +155,7 @@ def edit_feedback(feedback_id: int) -> object:
         )
         if not errors:
             db = get_db()
-            db.execute(
+            cursor = db.execute(
                 """
                 UPDATE feedback
                 SET title = ?, category = ?, description = ?, updated_at = ?
@@ -170,6 +170,9 @@ def edit_feedback(feedback_id: int) -> object:
                     g.user["id"],
                 ),
             )
+            if cursor.rowcount == 0:
+                db.rollback()
+                abort(403)
             db.commit()
             flash("Feedback updated successfully.", "success")
             return redirect(url_for("student.view_feedback", feedback_id=feedback_id))
@@ -190,10 +193,13 @@ def delete_feedback(feedback_id: int) -> object:
     """Allow a student to delete their own feedback only while its status is 'New'."""
     get_authorized_feedback(feedback_id, g.user, require_owner_new=True)
     db = get_db()
-    db.execute(
+    cursor = db.execute(
         "DELETE FROM feedback WHERE id = ? AND author_id = ? AND status = 'New';",
         (feedback_id, g.user["id"]),
     )
+    if cursor.rowcount == 0:
+        db.rollback()
+        abort(403)
     db.commit()
     flash("Feedback submission deleted.", "info")
     return redirect(url_for("student.dashboard"))

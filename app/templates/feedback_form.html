@@ -37,10 +37,12 @@
                 value="{{ form_data.title }}"
                 placeholder="Brief summary of your feedback"
                 class="{{ 'input-error' if errors.get('title') else '' }}"
+                aria-invalid="{{ 'true' if errors.get('title') else 'false' }}"
+                {% if errors.get('title') %}aria-describedby="title-error"{% endif %}
                 required
             >
             {% if errors.get('title') %}
-                <p class="field-error" role="alert">{{ errors['title'] }}</p>
+                <p id="title-error" class="field-error" role="alert">{{ errors['title'] }}</p>
             {% endif %}
         </div>
 
@@ -50,6 +52,8 @@
                 id="category"
                 name="category"
                 class="{{ 'input-error' if errors.get('category') else '' }}"
+                aria-invalid="{{ 'true' if errors.get('category') else 'false' }}"
+                {% if errors.get('category') %}aria-describedby="category-error"{% endif %}
                 required
             >
                 <option value="">Select a category</option>
@@ -58,7 +62,7 @@
                 {% endfor %}
             </select>
             {% if errors.get('category') %}
-                <p class="field-error" role="alert">{{ errors['category'] }}</p>
+                <p id="category-error" class="field-error" role="alert">{{ errors['category'] }}</p>
             {% endif %}
         </div>
 
@@ -72,13 +76,15 @@
                 data-char-count="description-counter"
                 placeholder="Provide clear context so your class representative can follow up"
                 class="{{ 'input-error' if errors.get('description') else '' }}"
+                aria-invalid="{{ 'true' if errors.get('description') else 'false' }}"
+                aria-describedby="description-counter{% if errors.get('description') %} description-error{% endif %}"
                 required
             >{{ form_data.description }}</textarea>
             <div class="field-meta">
                 <span class="muted" id="description-counter">0 / 2000 characters</span>
             </div>
             {% if errors.get('description') %}
-                <p class="field-error" role="alert">{{ errors['description'] }}</p>
+                <p id="description-error" class="field-error" role="alert">{{ errors['description'] }}</p>
             {% endif %}
         </div>
 
