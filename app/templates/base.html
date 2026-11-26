@@ -7,7 +7,111 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </head>
-<body>
+<body class="{{ 'theme-admin' if g.user and g.user.role == 'rep' else 'theme-student' }}">
+    {% if g.user and g.user.role == 'rep' %}
+    <div class="admin-shell">
+        <aside class="admin-sidebar" aria-label="Admin Navigation">
+            <div class="admin-sidebar-top">
+                <a href="{{ url_for('rep.dashboard') }}" class="brand">
+                    <span class="brand-badge brand-badge-admin" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <path d="m9 12 2 2 4-4"/>
+                        </svg>
+                    </span>
+                    <span class="brand-text">
+                        <strong>RepDesk Admin</strong>
+                        <small>{{ g.user.cohort }}</small>
+                    </span>
+                </a>
+
+                <div class="admin-nav-section">
+                    <span class="admin-nav-heading">Queue Views</span>
+                    <nav class="admin-nav">
+                        <a
+                            href="{{ url_for('rep.dashboard') }}"
+                            class="admin-nav-link {{ 'active' if request.endpoint == 'rep.dashboard' and not request.args.get('status') and not request.args.get('category') else '' }}"
+                        >
+                            All Cohort Tickets
+                        </a>
+                        <a
+                            href="{{ url_for('rep.dashboard', status='New') }}"
+                            class="admin-nav-link {{ 'active' if request.args.get('status') == 'New' else '' }}"
+                        >
+                            Needs Triage (New)
+                        </a>
+                        <a
+                            href="{{ url_for('rep.dashboard', status='In Review') }}"
+                            class="admin-nav-link {{ 'active' if request.args.get('status') == 'In Review' else '' }}"
+                        >
+                            In Review
+                        </a>
+                        <a
+                            href="{{ url_for('rep.dashboard', status='Resolved') }}"
+                            class="admin-nav-link {{ 'active' if request.args.get('status') == 'Resolved' else '' }}"
+                        >
+                            Resolved
+                        </a>
+                    </nav>
+                </div>
+
+                <div class="admin-nav-section">
+                    <span class="admin-nav-heading">By Topic</span>
+                    <nav class="admin-nav">
+                        {% for cat in config.ALLOWED_CATEGORIES %}
+                            <a
+                                href="{{ url_for('rep.dashboard', category=cat) }}"
+                                class="admin-nav-link {{ 'active' if request.args.get('category') == cat else '' }}"
+                            >
+                                {{ cat }}
+                            </a>
+                        {% endfor %}
+                    </nav>
+                </div>
+            </div>
+
+            <div class="admin-sidebar-footer">
+                <div class="admin-profile">
+                    <span class="user-avatar user-avatar-admin" aria-hidden="true">{{ g.user.full_name[:1] }}</span>
+                    <div>
+                        <strong class="admin-profile-name">{{ g.user.full_name }}</strong>
+                        <span class="role-pill role-rep">Class Rep Admin</span>
+                    </div>
+                </div>
+                <form action="{{ url_for('auth.logout') }}" method="post" class="admin-logout-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline btn-full btn-sm">Sign Out</button>
+                </form>
+            </div>
+        </aside>
+
+        <div class="admin-workspace">
+            <header class="admin-topbar">
+                <div class="admin-topbar-inner">
+                    <span class="admin-env-badge">Representative Management Console</span>
+                    <span class="muted">Scoped to {{ g.user.cohort }}</span>
+                </div>
+            </header>
+
+            <main class="admin-main">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="flash-stack" role="status" aria-live="polite">
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible">
+                                    <span>{{ message }}</span>
+                                    <button type="button" class="alert-close" data-dismiss-alert aria-label="Dismiss notification">&times;</button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                {% block admin_content %}{{ self.content() }}{% endblock %}
+            </main>
+        </div>
+    </div>
+    {% else %}
     <header class="site-header">
         <div class="container header-inner">
             <a href="{{ url_for('auth.index') }}" class="brand">
@@ -19,40 +123,29 @@
                 </span>
                 <span class="brand-text">
                     <strong>RepDesk</strong>
-                    <small>Class Rep Feedback Portal · Group B</small>
+                    <small>{{ 'Student Feedback Portal · Group B' if g.user else 'Class Rep Feedback Portal · Group B' }}</small>
                 </span>
             </a>
 
             {% if g.user %}
-            <nav class="main-nav" aria-label="Primary Navigation">
-                {% if g.user.role == 'student' %}
-                    <a
-                        href="{{ url_for('student.dashboard') }}"
-                        class="nav-link {{ 'active' if request.endpoint == 'student.dashboard' else '' }}"
-                    >
-                        My Feedback
-                    </a>
-                    <a
-                        href="{{ url_for('student.create_feedback') }}"
-                        class="btn btn-primary btn-sm"
-                    >
-                        + New Feedback
-                    </a>
-                {% elif g.user.role == 'rep' %}
-                    <a
-                        href="{{ url_for('rep.dashboard') }}"
-                        class="nav-link {{ 'active' if request.endpoint == 'rep.dashboard' else '' }}"
-                    >
-                        Feedback Queue
-                    </a>
-                {% endif %}
+            <nav class="main-nav" aria-label="Student Navigation">
+                <a
+                    href="{{ url_for('student.dashboard') }}"
+                    class="nav-link {{ 'active' if request.endpoint == 'student.dashboard' else '' }}"
+                >
+                    My Feedback
+                </a>
+                <a
+                    href="{{ url_for('student.create_feedback') }}"
+                    class="btn btn-primary btn-sm"
+                >
+                    + New Feedback
+                </a>
 
                 <div class="user-chip">
                     <span class="user-avatar" aria-hidden="true">{{ g.user.full_name[:1] }}</span>
                     <span class="user-name">{{ g.user.full_name }}</span>
-                    <span class="role-pill role-{{ g.user.role }}">
-                        {{ 'Class Rep' if g.user.role == 'rep' else 'Student' }}
-                    </span>
+                    <span class="role-pill role-student">Student</span>
                 </div>
 
                 <form action="{{ url_for('auth.logout') }}" method="post" class="inline-form">
@@ -83,6 +176,14 @@
         {% block content %}{% endblock %}
     </main>
 
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <span>RepDesk · MSc Cybersecurity Group B</span>
+            <span>Confidential Student &amp; Class Representative Portal</span>
+        </div>
+    </footer>
+    {% endif %}
+
     <div id="confirm-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" hidden>
         <div class="modal-card">
             <h2 id="confirm-modal-title">Confirm Deletion</h2>
@@ -93,12 +194,5 @@
             </div>
         </div>
     </div>
-
-    <footer class="site-footer">
-        <div class="container footer-inner">
-            <span>RepDesk · MSc Cybersecurity Group B</span>
-            <span>Confidential Student &amp; Class Representative Portal</span>
-        </div>
-    </footer>
 </body>
 </html>

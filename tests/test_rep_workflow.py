@@ -215,3 +215,23 @@ def test_rep_explicit_status_flow_and_xss_escaped_replies(app, client) -> None:
     # GET on rep POST endpoints is rejected
     assert client.get(f"/rep/feedback/{fid}/respond").status_code == 405
     assert client.get(f"/rep/feedback/{fid}/status").status_code == 405
+
+
+def test_student_and_rep_render_distinct_interfaces(client) -> None:
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    student_html = client.get("/student/dashboard").get_data(as_text=True)
+    assert "theme-student" in student_html
+    assert "Student Feedback Portal" in student_html
+    assert "RepDesk Admin" not in student_html
+
+    logout_token = extract_csrf_token(student_html)
+    client.post("/logout", data={"csrf_token": logout_token})
+
+    login_as(client, "niamh.gallagher@nci-demo.example", "RepDemo!2026")
+    rep_html = client.get("/rep/dashboard").get_data(as_text=True)
+    assert "theme-admin" in rep_html
+    assert "RepDesk Admin" in rep_html
+    assert "Representative Management Console" in rep_html
+
+    rep_detail_html = client.get("/rep/feedback/1").get_data(as_text=True)
+    assert "admin-triage-grid" in rep_detail_html

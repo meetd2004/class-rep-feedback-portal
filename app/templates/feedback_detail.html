@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ feedback.title }} · RepDesk{% endblock %}
+{% block title %}{{ feedback.title }} · {{ 'RepDesk Admin' if g.user.role == 'rep' else 'RepDesk' }}{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
@@ -10,6 +10,129 @@
     {% endif %}
 </div>
 
+{% if g.user.role == 'rep' %}
+<div class="admin-triage-grid">
+    <div class="admin-triage-primary">
+        <article class="card detail-card">
+            <div class="detail-header">
+                <div>
+                    <div class="meta-row">
+                        <span class="badge-category">{{ feedback.category }}</span>
+                        <span class="status-pill status-{{ feedback.status|lower|replace(' ', '-') }}">
+                            {{ feedback.status }}
+                        </span>
+                        <span class="muted">Ticket #{{ feedback.id }}</span>
+                    </div>
+                    <h1>{{ feedback.title }}</h1>
+                    <p class="muted">
+                        Student: <strong>{{ feedback.author_name }}</strong>
+                        · Submitted {{ feedback.created_at }}
+                        · Updated {{ feedback.updated_at }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="status-stepper" aria-label="Submission Progress">
+                <div class="step {{ 'step-done' if feedback.status in ('New', 'In Review', 'Resolved') else '' }} {{ 'step-current' if feedback.status == 'New' else '' }}">
+                    <span class="step-dot">1</span>
+                    <span>New</span>
+                </div>
+                <div class="step-line {{ 'step-line-active' if feedback.status in ('In Review', 'Resolved') else '' }}"></div>
+                <div class="step {{ 'step-done' if feedback.status in ('In Review', 'Resolved') else '' }} {{ 'step-current' if feedback.status == 'In Review' else '' }}">
+                    <span class="step-dot">2</span>
+                    <span>In Review</span>
+                </div>
+                <div class="step-line {{ 'step-line-active' if feedback.status == 'Resolved' else '' }}"></div>
+                <div class="step {{ 'step-done' if feedback.status == 'Resolved' else '' }} {{ 'step-current' if feedback.status == 'Resolved' else '' }}">
+                    <span class="step-dot">3</span>
+                    <span>Resolved</span>
+                </div>
+            </div>
+
+            <div class="feedback-body">{{ feedback.description }}</div>
+        </article>
+
+        <section class="card responses-card">
+            <h2>Official Responses ({{ responses|length }})</h2>
+
+            {% if responses %}
+                <div class="response-list">
+                    {% for resp in responses %}
+                        <div class="response-item">
+                            <div class="response-meta">
+                                <strong>{{ resp.rep_name }}</strong>
+                                <span class="role-pill role-rep">Class Rep Admin</span>
+                                <span class="muted">{{ resp.created_at }}</span>
+                            </div>
+                            <p class="response-text">{{ resp.message }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state compact">
+                    <p class="muted">No responses posted yet.</p>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+
+    <aside class="admin-triage-actions">
+        <div class="card">
+            <h2>Workflow Status</h2>
+            <p class="muted">Current status: <strong>{{ feedback.status }}</strong></p>
+
+            {% if allowed_next_statuses %}
+                <form action="{{ url_for('rep.update_status', feedback_id=feedback.id) }}" method="post" class="stack-form admin-form-top">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="form-group">
+                        <label for="status">Advance Status To</label>
+                        <select id="status" name="status" required>
+                            {% for next_status in allowed_next_statuses %}
+                                <option value="{{ next_status }}">{{ next_status }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-secondary btn-full">Update Status</button>
+                </form>
+            {% else %}
+                <p class="muted admin-form-top">This ticket is marked <strong>Resolved</strong>.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2>Reply to Student</h2>
+            <p class="muted">
+                {% if feedback.status == 'New' %}
+                    Posting a response automatically updates status to <strong>In Review</strong>.
+                {% else %}
+                    Your reply will be visible to {{ feedback.author_name }}.
+                {% endif %}
+            </p>
+
+            <form action="{{ url_for('rep.add_response', feedback_id=feedback.id) }}" method="post" class="stack-form admin-form-top" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <label for="message">Response <span class="required">*</span></label>
+                    <textarea
+                        id="message"
+                        name="message"
+                        rows="5"
+                        maxlength="1500"
+                        data-char-count="response-counter"
+                        aria-describedby="response-counter"
+                        placeholder="Write an update or resolution note..."
+                        required
+                    ></textarea>
+                    <div class="field-meta">
+                        <span class="muted" id="response-counter">0 / 1500 characters</span>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Post Response</button>
+            </form>
+        </div>
+    </aside>
+</div>
+{% else %}
 <article class="card detail-card">
     <div class="detail-header">
         <div>
@@ -28,7 +151,7 @@
             </p>
         </div>
 
-        {% if g.user.role == 'student' and feedback.author_id == g.user.id %}
+        {% if feedback.author_id == g.user.id %}
             <div class="detail-actions">
                 {% if feedback.status == 'New' %}
                     <a href="{{ url_for('student.edit_feedback', feedback_id=feedback.id) }}" class="btn btn-secondary">Edit</a>
@@ -70,66 +193,8 @@
     <div class="feedback-body">{{ feedback.description }}</div>
 </article>
 
-{% if g.user.role == 'rep' %}
-<section class="rep-controls-grid">
-    <div class="card">
-        <h2>Update Status</h2>
-        <p class="muted">Current status: <strong>{{ feedback.status }}</strong></p>
-
-        {% if allowed_next_statuses %}
-            <form action="{{ url_for('rep.update_status', feedback_id=feedback.id) }}" method="post" class="stack-form">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="form-group">
-                    <label for="status">Move Status To</label>
-                    <select id="status" name="status" required>
-                        {% for next_status in allowed_next_statuses %}
-                            <option value="{{ next_status }}">{{ next_status }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-secondary">Update Status</button>
-            </form>
-        {% else %}
-            <p class="muted">This submission is marked <strong>Resolved</strong>.</p>
-        {% endif %}
-    </div>
-
-    <div class="card">
-        <h2>Post Response</h2>
-        <p class="muted">
-            {% if feedback.status == 'New' %}
-                Posting a response will update status to <strong>In Review</strong>.
-            {% else %}
-                Your response will be visible to {{ feedback.author_name }}.
-            {% endif %}
-        </p>
-
-        <form action="{{ url_for('rep.add_response', feedback_id=feedback.id) }}" method="post" class="stack-form" novalidate>
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="form-group">
-                <label for="message">Response <span class="required">*</span></label>
-                <textarea
-                    id="message"
-                    name="message"
-                    rows="4"
-                    maxlength="1500"
-                    data-char-count="response-counter"
-                    aria-describedby="response-counter"
-                    placeholder="Write an update or resolution note..."
-                    required
-                ></textarea>
-                <div class="field-meta">
-                    <span class="muted" id="response-counter">0 / 1500 characters</span>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary">Post Response</button>
-        </form>
-    </div>
-</section>
-{% endif %}
-
 <section class="card responses-card">
-    <h2>Responses ({{ responses|length }})</h2>
+    <h2>Class Rep Responses ({{ responses|length }})</h2>
 
     {% if responses %}
         <div class="response-list">
@@ -150,4 +215,5 @@
         </div>
     {% endif %}
 </section>
+{% endif %}
 {% endblock %}

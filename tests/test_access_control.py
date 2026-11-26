@@ -57,6 +57,7 @@ def test_student_cannot_view_edit_or_delete_another_students_feedback(app, clien
 def test_student_cannot_access_rep_routes(client) -> None:
     login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
     assert client.get("/rep/dashboard").status_code == 403
+    assert client.get("/rep/feedback/1").status_code == 403
 
     token = extract_csrf_token(client.get("/student/dashboard").get_data(as_text=True))
     assert (
@@ -98,6 +99,7 @@ def test_out_of_cohort_rep_cannot_access_group_b_feedback(client) -> None:
     assert "Audio echo in Week 5 Cryptography recording" not in rep_dash.get_data(as_text=True)
 
     assert client.get("/feedback/1").status_code == 403
+    assert client.get("/rep/feedback/1").status_code == 403
 
     token = extract_csrf_token(rep_dash.get_data(as_text=True))
     assert (

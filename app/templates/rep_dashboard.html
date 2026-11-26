@@ -97,7 +97,7 @@
                     {% for item in submissions %}
                     <tr>
                         <td>
-                            <a href="{{ url_for('student.view_feedback', feedback_id=item.id) }}" class="row-link">
+                            <a href="{{ url_for('rep.view_feedback', feedback_id=item.id) }}" class="row-link">
                                 {{ item.title }}
                             </a>
                         </td>
@@ -111,7 +111,7 @@
                         <td>{{ item.response_count }}</td>
                         <td class="muted nowrap">{{ item.updated_at }}</td>
                         <td class="actions-cell">
-                            <a href="{{ url_for('student.view_feedback', feedback_id=item.id) }}" class="btn btn-secondary btn-sm">Review</a>
+                            <a href="{{ url_for('rep.view_feedback', feedback_id=item.id) }}" class="btn btn-secondary btn-sm">Review</a>
                         </td>
                     </tr>
                     {% endfor %}

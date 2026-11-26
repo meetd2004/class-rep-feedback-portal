@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from app.db import get_db, utc_now_iso
+from app.routes import render_feedback_detail
 from app.security import (
     get_authorized_feedback,
     login_required,
@@ -104,33 +105,7 @@ def create_feedback() -> object:
 @login_required
 def view_feedback(feedback_id: int) -> str:
     """View a feedback item and its rep responses (author student or assigned rep only)."""
-    feedback = get_authorized_feedback(feedback_id, g.user)
-    db = get_db()
-    responses = db.execute(
-        """
-        SELECT
-            r.id,
-            r.message,
-            r.created_at,
-            u.full_name AS rep_name
-        FROM responses AS r
-        JOIN users AS u ON u.id = r.rep_id
-        WHERE r.feedback_id = ?
-        ORDER BY r.created_at ASC, r.id ASC;
-        """,
-        (feedback_id,),
-    ).fetchall()
-
-    allowed_next_statuses = current_app.config["ALLOWED_STATUS_TRANSITIONS"].get(
-        feedback["status"], ()
-    )
-
-    return render_template(
-        "feedback_detail.html",
-        feedback=feedback,
-        responses=responses,
-        allowed_next_statuses=allowed_next_statuses,
-    )
+    return render_feedback_detail(feedback_id)
 
 
 @student_bp.route("/feedback/<int:feedback_id>/edit", methods=["GET", "POST"])

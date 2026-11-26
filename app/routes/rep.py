@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from app.db import get_db, utc_now_iso
+from app.routes import render_feedback_detail
 from app.security import (
     get_authorized_feedback,
     role_required,
@@ -106,6 +107,13 @@ def dashboard() -> str:
     )
 
 
+@rep_bp.route("/feedback/<int:feedback_id>")
+@role_required("rep")
+def view_feedback(feedback_id: int) -> str:
+    """Admin-side detail view for reviewing and responding to a cohort submission."""
+    return render_feedback_detail(feedback_id, require_rep_cohort=True)
+
+
 @rep_bp.route("/feedback/<int:feedback_id>/respond", methods=["POST"])
 @role_required("rep")
 def add_response(feedback_id: int) -> object:
@@ -115,7 +123,7 @@ def add_response(feedback_id: int) -> object:
 
     if error is not None:
         flash(error, "danger")
-        return redirect(url_for("student.view_feedback", feedback_id=feedback_id))
+        return redirect(url_for("rep.view_feedback", feedback_id=feedback_id))
 
     now = utc_now_iso()
     db = get_db()
@@ -143,7 +151,7 @@ def add_response(feedback_id: int) -> object:
     else:
         flash("Response posted.", "success")
 
-    return redirect(url_for("student.view_feedback", feedback_id=feedback_id))
+    return redirect(url_for("rep.view_feedback", feedback_id=feedback_id))
 
 
 @rep_bp.route("/feedback/<int:feedback_id>/status", methods=["POST"])
@@ -156,7 +164,7 @@ def update_status(feedback_id: int) -> object:
     error = validate_status_transition(feedback["status"], target_status)
     if error is not None:
         flash(error, "danger")
-        return redirect(url_for("student.view_feedback", feedback_id=feedback_id))
+        return redirect(url_for("rep.view_feedback", feedback_id=feedback_id))
 
     db = get_db()
     cursor = db.execute(
@@ -169,4 +177,4 @@ def update_status(feedback_id: int) -> object:
     db.commit()
 
     flash(f"Submission status updated to {target_status}.", "success")
-    return redirect(url_for("student.view_feedback", feedback_id=feedback_id))
+    return redirect(url_for("rep.view_feedback", feedback_id=feedback_id))
