@@ -13,26 +13,38 @@
 </section>
 
 <section class="stats-grid" aria-label="Cohort Queue Summary">
-    <div class="stat-card">
+    <a href="{{ url_for('rep.dashboard') }}" class="stat-card stat-link {{ 'stat-active' if not selected_status else '' }}">
         <span class="stat-label">Total Submissions</span>
         <strong class="stat-value">{{ counts.total }}</strong>
-    </div>
-    <div class="stat-card">
+    </a>
+    <a href="{{ url_for('rep.dashboard', status='New', category=selected_category or None) }}" class="stat-card stat-link {{ 'stat-active' if selected_status == 'New' else '' }}">
         <span class="stat-label">New</span>
         <strong class="stat-value stat-new">{{ counts['New'] }}</strong>
-    </div>
-    <div class="stat-card">
+    </a>
+    <a href="{{ url_for('rep.dashboard', status='In Review', category=selected_category or None) }}" class="stat-card stat-link {{ 'stat-active' if selected_status == 'In Review' else '' }}">
         <span class="stat-label">In Review</span>
         <strong class="stat-value stat-review">{{ counts['In Review'] }}</strong>
-    </div>
-    <div class="stat-card">
+    </a>
+    <a href="{{ url_for('rep.dashboard', status='Resolved', category=selected_category or None) }}" class="stat-card stat-link {{ 'stat-active' if selected_status == 'Resolved' else '' }}">
         <span class="stat-label">Resolved</span>
         <strong class="stat-value stat-resolved">{{ counts['Resolved'] }}</strong>
-    </div>
+    </a>
 </section>
 
 <section class="card table-card">
     <form action="{{ url_for('rep.dashboard') }}" method="get" class="filter-bar">
+        <div class="filter-group filter-search">
+            <label for="q">Search</label>
+            <input
+                id="q"
+                name="q"
+                type="search"
+                maxlength="80"
+                value="{{ search_query }}"
+                placeholder="Search title, details, or student..."
+            >
+        </div>
+
         <div class="filter-group">
             <label for="category">Category</label>
             <select id="category" name="category">
@@ -54,12 +66,18 @@
         </div>
 
         <div class="filter-actions">
-            <button type="submit" class="btn btn-primary">Apply Filters</button>
-            {% if selected_category or selected_status %}
+            <button type="submit" class="btn btn-primary">Apply</button>
+            {% if selected_category or selected_status or search_query %}
                 <a href="{{ url_for('rep.dashboard') }}" class="btn btn-secondary">Clear</a>
             {% endif %}
         </div>
     </form>
+
+    {% if selected_category or selected_status or search_query %}
+        <div class="filter-summary">
+            <span class="muted">Showing <strong>{{ submissions|length }}</strong> of {{ counts.total }} cohort submissions</span>
+        </div>
+    {% endif %}
 
     {% if submissions %}
         <div class="table-wrap">
@@ -104,13 +122,13 @@
         <div class="empty-state">
             <h2>No submissions match your filters</h2>
             <p class="muted">
-                {% if selected_category or selected_status %}
-                    Adjust or reset the active category and status filters.
+                {% if selected_category or selected_status or search_query %}
+                    Adjust or reset the active search, category, and status filters.
                 {% else %}
                     There are currently no submissions for {{ g.user.cohort }}.
                 {% endif %}
             </p>
-            {% if selected_category or selected_status %}
+            {% if selected_category or selected_status or search_query %}
                 <a href="{{ url_for('rep.dashboard') }}" class="btn btn-secondary">Reset Filters</a>
             {% endif %}
         </div>

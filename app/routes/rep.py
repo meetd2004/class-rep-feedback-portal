@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from app.db import get_db, utc_now_iso
 from app.security import (
@@ -15,20 +15,28 @@ from app.security import (
 rep_bp = Blueprint("rep", __name__, url_prefix="/rep")
 
 
+def _escape_like(value: str) -> str:
+    """Escape SQL LIKE wildcards so user search terms match literally."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 @rep_bp.route("/dashboard")
 @role_required("rep")
 def dashboard() -> str:
-    """Display all feedback for the rep's assigned cohort with safe category/status filters."""
+    """Display all feedback for the rep's assigned cohort with safe filters and search."""
     categories = current_app.config["ALLOWED_CATEGORIES"]
     statuses = current_app.config["ALLOWED_STATUSES"]
 
     selected_category = request.args.get("category", "").strip()
     selected_status = request.args.get("status", "").strip()
+    search_query = request.args.get("q", "").strip()[:80]
 
     if selected_category not in categories:
         selected_category = ""
     if selected_status not in statuses:
         selected_status = ""
+
+    like_pattern = f"%{_escape_like(search_query.lower())}%" if search_query else ""
 
     db = get_db()
 
@@ -58,6 +66,12 @@ def dashboard() -> str:
         WHERE f.cohort = ?
           AND (? = '' OR f.category = ?)
           AND (? = '' OR f.status = ?)
+          AND (
+              ? = ''
+              OR lower(f.title) LIKE ? ESCAPE '\\'
+              OR lower(f.description) LIKE ? ESCAPE '\\'
+              OR lower(u.full_name) LIKE ? ESCAPE '\\'
+          )
         ORDER BY
             CASE f.status
                 WHEN 'New' THEN 1
@@ -73,6 +87,10 @@ def dashboard() -> str:
             selected_category,
             selected_status,
             selected_status,
+            search_query,
+            like_pattern,
+            like_pattern,
+            like_pattern,
         ),
     ).fetchall()
 
@@ -83,6 +101,7 @@ def dashboard() -> str:
         statuses=statuses,
         selected_category=selected_category,
         selected_status=selected_status,
+        search_query=search_query,
         counts=counts,
     )
 
@@ -110,10 +129,13 @@ def add_response(feedback_id: int) -> object:
 
     # Automatically move 'New' -> 'In Review' once a rep responds so the item is locked from student edits/deletion.
     new_status = "In Review" if feedback["status"] == "New" else feedback["status"]
-    db.execute(
-        "UPDATE feedback SET status = ?, updated_at = ? WHERE id = ?;",
-        (new_status, now, feedback_id),
+    cursor = db.execute(
+        "UPDATE feedback SET status = ?, updated_at = ? WHERE id = ? AND cohort = ?;",
+        (new_status, now, feedback_id, g.user["cohort"]),
     )
+    if cursor.rowcount == 0:
+        db.rollback()
+        abort(403)
     db.commit()
 
     if feedback["status"] == "New":
@@ -137,10 +159,13 @@ def update_status(feedback_id: int) -> object:
         return redirect(url_for("student.view_feedback", feedback_id=feedback_id))
 
     db = get_db()
-    db.execute(
-        "UPDATE feedback SET status = ?, updated_at = ? WHERE id = ?;",
-        (target_status, utc_now_iso(), feedback_id),
+    cursor = db.execute(
+        "UPDATE feedback SET status = ?, updated_at = ? WHERE id = ? AND cohort = ? AND status = ?;",
+        (target_status, utc_now_iso(), feedback_id, g.user["cohort"], feedback["status"]),
     )
+    if cursor.rowcount == 0:
+        db.rollback()
+        abort(409)
     db.commit()
 
     flash(f"Submission status updated to {target_status}.", "success")

@@ -127,3 +127,91 @@ def test_sql_injection_payloads_cannot_bypass_auth_or_filters(client) -> None:
     login_as(client, "niamh.gallagher@nci-demo.example", "RepDemo!2026")
     sqli_filter = client.get("/rep/dashboard?category=' OR 1=1 --&status=New")
     assert sqli_filter.status_code == 200
+
+    sqli_search = client.get("/rep/dashboard?q=' OR 1=1 --")
+    assert sqli_search.status_code == 200
+    assert "No submissions match your filters" in sqli_search.get_data(as_text=True)
+
+
+def test_rep_dashboard_search_filters_and_escapes_wildcards(client) -> None:
+    login_as(client, "niamh.gallagher@nci-demo.example", "RepDemo!2026")
+
+    match_html = client.get("/rep/dashboard?q=Cryptography").get_data(as_text=True)
+    assert "Audio echo in Week 5 Cryptography recording" in match_html
+    assert "Broken lab VM mirror link in Week 3 Moodle folder" not in match_html
+
+    # Literal '%' must not match everything as an unescaped SQL LIKE wildcard
+    wildcard_html = client.get("/rep/dashboard?q=%").get_data(as_text=True)
+    assert "No submissions match your filters" in wildcard_html
+
+
+def test_rep_response_validation_rejects_short_or_empty_messages(app, client) -> None:
+    conn = connect_sqlite(app.config["DATABASE_PATH"])
+    try:
+        target = conn.execute(
+            "SELECT id FROM feedback WHERE status = 'New' LIMIT 1;"
+        ).fetchone()
+    finally:
+        conn.close()
+    assert target is not None
+    fid = target["id"]
+
+    login_as(client, "niamh.gallagher@nci-demo.example", "RepDemo!2026")
+    token = extract_csrf_token(client.get(f"/feedback/{fid}").get_data(as_text=True))
+
+    res = client.post(
+        f"/rep/feedback/{fid}/respond",
+        data={"csrf_token": token, "message": "Ok"},
+        follow_redirects=True,
+    )
+    assert "Response must be between 5 and 1500 characters." in res.get_data(as_text=True)
+
+    conn = connect_sqlite(app.config["DATABASE_PATH"])
+    try:
+        row = conn.execute("SELECT status FROM feedback WHERE id = ?;", (fid,)).fetchone()
+    finally:
+        conn.close()
+    assert row["status"] == "New"
+
+
+def test_rep_explicit_status_flow_and_xss_escaped_replies(app, client) -> None:
+    conn = connect_sqlite(app.config["DATABASE_PATH"])
+    try:
+        target = conn.execute(
+            """
+            SELECT f.id
+            FROM feedback AS f
+            JOIN users AS u ON u.id = f.author_id
+            WHERE u.email = 'ciaran.byrne@nci-demo.example' AND f.status = 'New';
+            """
+        ).fetchone()
+    finally:
+        conn.close()
+    assert target is not None
+    fid = target["id"]
+
+    login_as(client, "niamh.gallagher@nci-demo.example", "RepDemo!2026")
+    token = extract_csrf_token(client.get(f"/feedback/{fid}").get_data(as_text=True))
+
+    # Move New -> In Review explicitly first
+    r1 = client.post(
+        f"/rep/feedback/{fid}/status",
+        data={"csrf_token": token, "status": "In Review"},
+        follow_redirects=True,
+    )
+    assert "Submission status updated to In Review." in r1.get_data(as_text=True)
+
+    # Post reply containing script tag -> must render HTML-escaped
+    token2 = extract_csrf_token(r1.get_data(as_text=True))
+    r2 = client.post(
+        f"/rep/feedback/{fid}/respond",
+        data={"csrf_token": token2, "message": "Update <script>alert('rep')</script> confirmed."},
+        follow_redirects=True,
+    )
+    html = r2.get_data(as_text=True)
+    assert "<script>alert('rep')</script>" not in html
+    assert "&lt;script&gt;alert(&#39;rep&#39;)&lt;/script&gt;" in html
+
+    # GET on rep POST endpoints is rejected
+    assert client.get(f"/rep/feedback/{fid}/respond").status_code == 405
+    assert client.get(f"/rep/feedback/{fid}/status").status_code == 405
