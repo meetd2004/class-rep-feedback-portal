@@ -6,6 +6,25 @@
 
 The application is designed around secure web development principles across all layers (database, backend, templates, and HTTP transport configuration), enforcing authentication, server-side authorization, CSRF protection, output escaping, and parameterised queries.
 
+### Stack Decision
+This repository uses **Python 3.12, Flask 3.1.3, SQLite, Jinja2 templates, plain CSS, Flask-WTF (`CSRFProtect`), and `argon2-cffi`** because the existing codebase and commit history (`b7ec7c2`–`0f3f4f9`) already established and verified this stack with automated `pytest` and `Bandit` checks.
+
+### Role Matrix and First-Version Scope
+
+| Capability / Route Scope | Unauthenticated | Student (`Group B`) | Class Rep (`Group B`) |
+| :--- | :--- | :--- | :--- |
+| Sign in / Sign out | Allowed (`POST /login` only) | Allowed (`POST /logout` + CSRF) | Allowed (`POST /logout` + CSRF) |
+| Create feedback (`New`) | Denied (redirect to login) | Allowed | Denied (`403`) |
+| View submission list & detail | Denied (redirect to login) | Own submissions only (`403` on others) | All `Group B` submissions (`403` on other cohorts) |
+| Edit / Delete submission | Denied | Own submissions while status is `New` (`403` once `In Review`/`Resolved`) | Denied (`403`) |
+| Change status (`New` → `In Review` → `Resolved`) | Denied | Denied (`403`) | Allowed (`Group B` only) |
+| Post official reply | Denied | Denied (`403`) | Allowed (`Group B` only; moves `New` → `In Review`) |
+
+**Scope Boundaries (v1):**
+- Scoped to a single cohort (**MSc Cybersecurity Group B**) with two fictional student accounts and one fictional class rep account.
+- **Feedback** is the primary entity demonstrating all four CRUD operations (`Create`, `Read`, `Update`, `Delete`), with deletion confirmed before execution.
+- Public self-registration, anonymous feedback submissions, and a separate admin dashboard are intentionally outside the first version.
+
 ---
 
 ## 2. Features and Security Objectives
@@ -54,7 +73,7 @@ Class_Rep_Feedback/
 │   │   └── rep.py                # /rep/dashboard, /rep/feedback/<id>/respond, /status
 │   ├── templates/
 │   │   ├── base.html             # Shared layout, navigation, flash stack, CSRF logout
-│   │   ├── login.html            # Login view with fictional demo credentials card
+│   │   ├── login.html            # Clean sign-in form
 │   │   ├── student_dashboard.html
 │   │   ├── feedback_form.html    # Create and edit feedback form with validation feedback
 │   │   ├── feedback_detail.html  # Detail view, status progression, rep response form, responses list
@@ -62,7 +81,7 @@ Class_Rep_Feedback/
 │   │   └── error.html            # Custom non-leaking HTTP error page
 │   └── static/
 │       ├── css/styles.css        # Responsive, accessible stylesheet
-│       └── js/app.js             # CSP-compliant delete confirm, char counter, demo autofill
+│       └── js/app.js             # CSP-compliant delete confirm and character counter
 └── tests/
     ├── conftest.py               # Isolated temp SQLite fixtures & CSRF helpers
     ├── test_auth_and_csrf.py     # Hashing, role redirects, session flags, headers, CSRF rejection
