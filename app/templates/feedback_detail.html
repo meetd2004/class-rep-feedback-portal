@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ feedback.title }} · Class Rep Feedback Portal{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    {% if g.user.role == 'rep' %}
+        <a href="{{ url_for('rep.dashboard') }}">&larr; Back to Rep Queue</a>
+    {% else %}
+        <a href="{{ url_for('student.dashboard') }}">&larr; Back to My Feedback</a>
+    {% endif %}
+</div>
+
+<article class="card detail-card">
+    <div class="detail-header">
+        <div>
+            <div class="meta-row">
+                <span class="badge-category">{{ feedback.category }}</span>
+                <span class="status-pill status-{{ feedback.status|lower|replace(' ', '-') }}">
+                    {{ feedback.status }}
+                </span>
+                <span class="muted">Submission #{{ feedback.id }}</span>
+            </div>
+            <h1>{{ feedback.title }}</h1>
+            <p class="muted">
+                Submitted by <strong>{{ feedback.author_name }}</strong> ({{ feedback.cohort }})
+                · Created {{ feedback.created_at }}
+                · Updated {{ feedback.updated_at }}
+            </p>
+        </div>
+
+        {% if g.user.role == 'student' and feedback.author_id == g.user.id %}
+            <div class="detail-actions">
+                {% if feedback.status == 'New' %}
+                    <a href="{{ url_for('student.edit_feedback', feedback_id=feedback.id) }}" class="btn btn-secondary">Edit</a>
+                    <form
+                        action="{{ url_for('student.delete_feedback', feedback_id=feedback.id) }}"
+                        method="post"
+                        class="inline-form"
+                        data-confirm-message="Delete this feedback submission permanently? This cannot be undone."
+                    >
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                {% else %}
+                    <span class="locked-banner">
+                        Editing and deletion are disabled once status is {{ feedback.status }}.
+                    </span>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="feedback-body">{{ feedback.description }}</div>
+</article>
+
+{% if g.user.role == 'rep' %}
+<section class="rep-controls-grid">
+    <div class="card">
+        <h2>Update Status</h2>
+        <p class="muted">Current status: <strong>{{ feedback.status }}</strong></p>
+
+        {% if allowed_next_statuses %}
+            <form action="{{ url_for('rep.update_status', feedback_id=feedback.id) }}" method="post" class="stack-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <label for="status">Move Status To</label>
+                    <select id="status" name="status" required>
+                        {% for next_status in allowed_next_statuses %}
+                            <option value="{{ next_status }}">{{ next_status }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-secondary">Update Status</button>
+            </form>
+        {% else %}
+            <p class="muted">This submission is <strong>Resolved</strong> and requires no further status transition.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Add Class Rep Response</h2>
+        <p class="muted">
+            {% if feedback.status == 'New' %}
+                Posting a response automatically changes status from <strong>New</strong> to <strong>In Review</strong>.
+            {% else %}
+                Your response will be immediately visible to {{ feedback.author_name }}.
+            {% endif %}
+        </p>
+
+        <form action="{{ url_for('rep.add_response', feedback_id=feedback.id) }}" method="post" class="stack-form" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="message">Response Message <span class="required">*</span></label>
+                <textarea
+                    id="message"
+                    name="message"
+                    rows="4"
+                    maxlength="1500"
+                    data-char-count="response-counter"
+                    placeholder="Write an update or resolution note (5–1500 characters)..."
+                    required
+                ></textarea>
+                <div class="field-meta">
+                    <span class="muted" id="response-counter">0 / 1500 characters</span>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Post Response</button>
+        </form>
+    </div>
+</section>
+{% endif %}
+
+<section class="card responses-card">
+    <h2>Class Rep Responses ({{ responses|length }})</h2>
+
+    {% if responses %}
+        <div class="response-list">
+            {% for resp in responses %}
+                <div class="response-item">
+                    <div class="response-meta">
+                        <strong>{{ resp.rep_name }}</strong>
+                        <span class="role-pill role-rep">Class Rep</span>
+                        <span class="muted">{{ resp.created_at }}</span>
+                    </div>
+                    <p class="response-text">{{ resp.message }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state compact">
+            <p class="muted">No class rep responses have been posted yet.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

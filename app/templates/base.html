@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Class Rep Feedback Portal{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="{{ url_for('auth.index') }}" class="brand">
+                <span class="brand-badge">Group B</span>
+                <span class="brand-text">
+                    <strong>Class Rep Feedback Portal</strong>
+                    <small>MSc Cybersecurity · National College of Ireland</small>
+                </span>
+            </a>
+
+            {% if g.user %}
+            <nav class="main-nav" aria-label="Primary Navigation">
+                {% if g.user.role == 'student' %}
+                    <a href="{{ url_for('student.dashboard') }}" class="nav-link">My Feedback</a>
+                    <a href="{{ url_for('student.create_feedback') }}" class="btn btn-primary btn-sm">+ Submit Feedback</a>
+                {% elif g.user.role == 'rep' %}
+                    <a href="{{ url_for('rep.dashboard') }}" class="nav-link">Rep Queue</a>
+                {% endif %}
+
+                <div class="user-chip">
+                    <span class="user-name">{{ g.user.full_name }}</span>
+                    <span class="role-pill role-{{ g.user.role }}">
+                        {{ 'Class Rep' if g.user.role == 'rep' else 'Student' }}
+                    </span>
+                </div>
+
+                <form action="{{ url_for('auth.logout') }}" method="post" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline btn-sm">Sign Out</button>
+                </form>
+            </nav>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="container main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-stack" role="status" aria-live="polite">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <span>MSc Cybersecurity Group B · Secure Web Development Portal</span>
+            <span>Fictional demo accounts and feedback data only</span>
+        </div>
+    </footer>
+</body>
+</html>

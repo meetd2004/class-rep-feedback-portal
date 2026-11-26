@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Rep Dashboard · Class Rep Feedback Portal{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <span class="eyebrow">{{ g.user.cohort }}</span>
+        <h1>Class Rep Review Queue</h1>
+        <p class="muted">
+            Review private student submissions for your assigned group, post updates, and track resolution progress.
+        </p>
+    </div>
+</section>
+
+<section class="stats-grid" aria-label="Cohort Queue Summary">
+    <div class="stat-card">
+        <span class="stat-label">Total Cohort Items</span>
+        <strong class="stat-value">{{ counts.total }}</strong>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">New</span>
+        <strong class="stat-value stat-new">{{ counts['New'] }}</strong>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">In Review</span>
+        <strong class="stat-value stat-review">{{ counts['In Review'] }}</strong>
+    </div>
+    <div class="stat-card">
+        <span class="stat-label">Resolved</span>
+        <strong class="stat-value stat-resolved">{{ counts['Resolved'] }}</strong>
+    </div>
+</section>
+
+<section class="card">
+    <form action="{{ url_for('rep.dashboard') }}" method="get" class="filter-bar">
+        <div class="filter-group">
+            <label for="category">Category</label>
+            <select id="category" name="category">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                    <option value="{{ cat }}" {{ 'selected' if selected_category == cat else '' }}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="status">Status</label>
+            <select id="status" name="status">
+                <option value="">All Statuses</option>
+                {% for st in statuses %}
+                    <option value="{{ st }}" {{ 'selected' if selected_status == st else '' }}>{{ st }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-primary">Apply Filters</button>
+            {% if selected_category or selected_status %}
+                <a href="{{ url_for('rep.dashboard') }}" class="btn btn-secondary">Clear</a>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if submissions %}
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Student</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Responses</th>
+                        <th>Updated</th>
+                        <th class="actions-col">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in submissions %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('student.view_feedback', feedback_id=item.id) }}" class="row-link">
+                                {{ item.title }}
+                            </a>
+                        </td>
+                        <td>{{ item.author_name }}</td>
+                        <td><span class="badge-category">{{ item.category }}</span></td>
+                        <td>
+                            <span class="status-pill status-{{ item.status|lower|replace(' ', '-') }}">
+                                {{ item.status }}
+                            </span>
+                        </td>
+                        <td>{{ item.response_count }}</td>
+                        <td class="muted nowrap">{{ item.updated_at }}</td>
+                        <td class="actions-cell">
+                            <a href="{{ url_for('student.view_feedback', feedback_id=item.id) }}" class="btn btn-secondary btn-sm">Review</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h2>No submissions match your filters</h2>
+            <p class="muted">
+                {% if selected_category or selected_status %}
+                    Try clearing or adjusting the selected category and status filters.
+                {% else %}
+                    There are currently no feedback submissions in {{ g.user.cohort }}.
+                {% endif %}
+            </p>
+            {% if selected_category or selected_status %}
+                <a href="{{ url_for('rep.dashboard') }}" class="btn btn-secondary">Reset Filters</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Sign In · Class Rep Feedback Portal{% endblock %}
+
+{% block content %}
+<section class="auth-layout">
+    <div class="card auth-card">
+        <div class="card-header">
+            <span class="eyebrow">{{ cohort }}</span>
+            <h1>Sign In to Portal</h1>
+            <p class="muted">
+                Raise class-level concerns privately or manage Group B class representative responses.
+            </p>
+        </div>
+
+        {% if error_message %}
+            <div class="alert alert-danger" role="alert">{{ error_message }}</div>
+        {% endif %}
+
+        <form action="{{ url_for('auth.login') }}" method="post" class="stack-form" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value="{{ email_value }}"
+                    autocomplete="username"
+                    placeholder="name@nci-demo.example"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="Enter your password"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+        </form>
+    </div>
+
+    <aside class="card demo-card">
+        <h2>Fictional Demo Accounts</h2>
+        <p class="muted">
+            Use these seeded accounts to test student privacy, CRUD controls, and class rep workflows:
+        </p>
+
+        <div class="demo-list">
+            <div class="demo-account">
+                <div>
+                    <strong>Aoife Brennan</strong>
+                    <span class="role-pill role-student">Student</span>
+                    <div class="demo-creds">aoife.brennan@nci-demo.example · StudentDemo!2026</div>
+                </div>
+                <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    data-fill-email="aoife.brennan@nci-demo.example"
+                    data-fill-password="StudentDemo!2026"
+                >
+                    Fill
+                </button>
+            </div>
+
+            <div class="demo-account">
+                <div>
+                    <strong>Ciaran Byrne</strong>
+                    <span class="role-pill role-student">Student</span>
+                    <div class="demo-creds">ciaran.byrne@nci-demo.example · StudentDemo!2026</div>
+                </div>
+                <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    data-fill-email="ciaran.byrne@nci-demo.example"
+                    data-fill-password="StudentDemo!2026"
+                >
+                    Fill
+                </button>
+            </div>
+
+            <div class="demo-account">
+                <div>
+                    <strong>Niamh Gallagher</strong>
+                    <span class="role-pill role-rep">Class Rep</span>
+                    <div class="demo-creds">niamh.gallagher@nci-demo.example · RepDemo!2026</div>
+                </div>
+                <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    data-fill-email="niamh.gallagher@nci-demo.example"
+                    data-fill-password="RepDemo!2026"
+                >
+                    Fill
+                </button>
+            </div>
+        </div>
+
+        <p class="security-note">
+            Passwords are stored using Argon2id hashing. Submissions are private to the author and Group B reps.
+        </p>
+    </aside>
+</section>
+{% endblock %}
