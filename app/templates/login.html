@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Sign In · RepDesk{% endblock %}
+{% block title %}RepDesk · Class Rep Feedback Portal{% endblock %}
 
 {% block content %}
 {% if not error_message %}
@@ -20,7 +20,81 @@
 <script src="{{ url_for('static', filename='vendor/lottie_light.min.js') }}" defer></script>
 {% endif %}
 
-<section class="auth-center">
+<section class="landing-hero">
+    <div class="hero-top">
+        <div class="hero-copy">
+            <span class="hero-pill">{{ cohort }}</span>
+            <h1>Structured Class Feedback, Resolved Transparently</h1>
+            <p class="hero-lead">
+                A dedicated portal for students to raise module, assessment, timetable, and learning-resource
+                concerns privately and track class representative responses through to resolution.
+            </p>
+        </div>
+
+        <div class="hero-meta-box">
+            <div class="hero-meta-block">
+                <span class="hero-meta-label">Feedback Topics</span>
+                <div class="hero-tags">
+                    <span>Lectures</span>
+                    <span>Assessments</span>
+                    <span>Timetables</span>
+                    <span>Learning Resources</span>
+                </div>
+            </div>
+            <div class="hero-meta-block">
+                <span class="hero-meta-label">Resolution Flow</span>
+                <div class="hero-flow">
+                    <span class="flow-chip">New</span>
+                    <span class="flow-arrow" aria-hidden="true">&rarr;</span>
+                    <span class="flow-chip">In Review</span>
+                    <span class="flow-arrow" aria-hidden="true">&rarr;</span>
+                    <span class="flow-chip">Resolved</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="hero-features">
+        <div class="feature-item">
+            <div class="feature-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            </div>
+            <div>
+                <h3>Private by Default</h3>
+                <p>Submissions are restricted strictly to the author and assigned Group B class representatives.</p>
+            </div>
+        </div>
+
+        <div class="feature-item">
+            <div class="feature-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+            </div>
+            <div>
+                <h3>Editable While New</h3>
+                <p>Refine or withdraw your submission anytime before a class representative begins review.</p>
+            </div>
+        </div>
+
+        <div class="feature-item">
+            <div class="feature-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            </div>
+            <div>
+                <h3>Direct Rep Updates</h3>
+                <p>Receive clear status updates and official responses directly on each submission thread.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="auth-center auth-below-hero">
     <div class="card auth-card {{ 'auth-card-animate' if not error_message else '' }}">
         <div class="auth-icon" aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -30,10 +104,10 @@
         </div>
 
         <div class="card-header">
-            <span class="eyebrow">{{ cohort }}</span>
-            <h1>Sign in to your account</h1>
+            <span class="eyebrow">Portal Access</span>
+            <h2>Sign in to your account</h2>
             <p class="muted">
-                Access your feedback submissions and class representative updates.
+                Use your assigned student or class representative credentials to continue.
             </p>
         </div>
 
