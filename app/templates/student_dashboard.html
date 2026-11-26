@@ -1,14 +1,13 @@
 {% extends "base.html" %}
-{% block title %}My Feedback · Class Rep Feedback Portal{% endblock %}
+{% block title %}My Feedback · RepDesk{% endblock %}
 
 {% block content %}
 <section class="page-head">
     <div>
         <span class="eyebrow">{{ g.user.cohort }}</span>
-        <h1>My Feedback Submissions</h1>
+        <h1>My Feedback</h1>
         <p class="muted">
-            Submissions are private between you and your Group B class representatives.
-            Items marked <strong>New</strong> can still be edited or deleted.
+            Submit course feedback privately and track responses from your class representative.
         </p>
     </div>
     <a href="{{ url_for('student.create_feedback') }}" class="btn btn-primary">+ New Feedback</a>
@@ -20,7 +19,7 @@
         <strong class="stat-value">{{ counts.total }}</strong>
     </div>
     <div class="stat-card">
-        <span class="stat-label">New (Editable)</span>
+        <span class="stat-label">New</span>
         <strong class="stat-value stat-new">{{ counts['New'] }}</strong>
     </div>
     <div class="stat-card">
@@ -33,7 +32,7 @@
     </div>
 </section>
 
-<section class="card">
+<section class="card table-card">
     {% if submissions %}
         <div class="table-wrap">
             <table class="data-table">
@@ -77,7 +76,7 @@
                                     <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                                 </form>
                             {% else %}
-                                <span class="locked-tag" title="Submissions under review or resolved cannot be edited or deleted.">Locked</span>
+                                <span class="locked-tag">Locked</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -89,9 +88,9 @@
         <div class="empty-state">
             <h2>No feedback submitted yet</h2>
             <p class="muted">
-                Have a suggestion or concern about lectures, assessments, timetables, or learning resources?
+                Raise a concern or suggestion regarding lectures, assessments, timetables, or learning resources.
             </p>
-            <a href="{{ url_for('student.create_feedback') }}" class="btn btn-primary">Submit Your First Feedback</a>
+            <a href="{{ url_for('student.create_feedback') }}" class="btn btn-primary">Submit Feedback</a>
         </div>
     {% endif %}
 </section>

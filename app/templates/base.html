@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Class Rep Feedback Portal{% endblock %}</title>
+    <title>{% block title %}RepDesk · Class Rep Feedback Portal{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </head>
@@ -11,10 +11,10 @@
     <header class="site-header">
         <div class="container header-inner">
             <a href="{{ url_for('auth.index') }}" class="brand">
-                <span class="brand-badge">Group B</span>
+                <span class="brand-badge" aria-hidden="true">RD</span>
                 <span class="brand-text">
-                    <strong>Class Rep Feedback Portal</strong>
-                    <small>MSc Cybersecurity · National College of Ireland</small>
+                    <strong>RepDesk</strong>
+                    <small>Class Rep Feedback Portal · Group B</small>
                 </span>
             </a>
 
@@ -22,9 +22,9 @@
             <nav class="main-nav" aria-label="Primary Navigation">
                 {% if g.user.role == 'student' %}
                     <a href="{{ url_for('student.dashboard') }}" class="nav-link">My Feedback</a>
-                    <a href="{{ url_for('student.create_feedback') }}" class="btn btn-primary btn-sm">+ Submit Feedback</a>
+                    <a href="{{ url_for('student.create_feedback') }}" class="btn btn-primary btn-sm">+ New Feedback</a>
                 {% elif g.user.role == 'rep' %}
-                    <a href="{{ url_for('rep.dashboard') }}" class="nav-link">Rep Queue</a>
+                    <a href="{{ url_for('rep.dashboard') }}" class="nav-link">Feedback Queue</a>
                 {% endif %}
 
                 <div class="user-chip">
@@ -59,8 +59,8 @@
 
     <footer class="site-footer">
         <div class="container footer-inner">
-            <span>MSc Cybersecurity Group B · Secure Web Development Portal</span>
-            <span>Fictional demo accounts and feedback data only</span>
+            <span>RepDesk · MSc Cybersecurity Group B</span>
+            <span>Confidential Student &amp; Class Representative Portal</span>
         </div>
     </footer>
 </body>

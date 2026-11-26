@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}{{ feedback.title }} · Class Rep Feedback Portal{% endblock %}
+{% block title %}{{ feedback.title }} · RepDesk{% endblock %}
 
 {% block content %}
 <div class="breadcrumb">
     {% if g.user.role == 'rep' %}
-        <a href="{{ url_for('rep.dashboard') }}">&larr; Back to Rep Queue</a>
+        <a href="{{ url_for('rep.dashboard') }}">&larr; Back to Feedback Queue</a>
     {% else %}
         <a href="{{ url_for('student.dashboard') }}">&larr; Back to My Feedback</a>
     {% endif %}
@@ -22,7 +22,7 @@
             </div>
             <h1>{{ feedback.title }}</h1>
             <p class="muted">
-                Submitted by <strong>{{ feedback.author_name }}</strong> ({{ feedback.cohort }})
+                Submitted by <strong>{{ feedback.author_name }}</strong>
                 · Created {{ feedback.created_at }}
                 · Updated {{ feedback.updated_at }}
             </p>
@@ -43,7 +43,7 @@
                     </form>
                 {% else %}
                     <span class="locked-banner">
-                        Editing and deletion are disabled once status is {{ feedback.status }}.
+                        Editing is locked while status is {{ feedback.status }}.
                     </span>
                 {% endif %}
             </div>
@@ -73,31 +73,31 @@
                 <button type="submit" class="btn btn-secondary">Update Status</button>
             </form>
         {% else %}
-            <p class="muted">This submission is <strong>Resolved</strong> and requires no further status transition.</p>
+            <p class="muted">This submission is marked <strong>Resolved</strong>.</p>
         {% endif %}
     </div>
 
     <div class="card">
-        <h2>Add Class Rep Response</h2>
+        <h2>Post Response</h2>
         <p class="muted">
             {% if feedback.status == 'New' %}
-                Posting a response automatically changes status from <strong>New</strong> to <strong>In Review</strong>.
+                Posting a response will update status to <strong>In Review</strong>.
             {% else %}
-                Your response will be immediately visible to {{ feedback.author_name }}.
+                Your response will be visible to {{ feedback.author_name }}.
             {% endif %}
         </p>
 
         <form action="{{ url_for('rep.add_response', feedback_id=feedback.id) }}" method="post" class="stack-form" novalidate>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
-                <label for="message">Response Message <span class="required">*</span></label>
+                <label for="message">Response <span class="required">*</span></label>
                 <textarea
                     id="message"
                     name="message"
                     rows="4"
                     maxlength="1500"
                     data-char-count="response-counter"
-                    placeholder="Write an update or resolution note (5–1500 characters)..."
+                    placeholder="Write an update or resolution note..."
                     required
                 ></textarea>
                 <div class="field-meta">
@@ -111,7 +111,7 @@
 {% endif %}
 
 <section class="card responses-card">
-    <h2>Class Rep Responses ({{ responses|length }})</h2>
+    <h2>Responses ({{ responses|length }})</h2>
 
     {% if responses %}
         <div class="response-list">
@@ -128,7 +128,7 @@
         </div>
     {% else %}
         <div class="empty-state compact">
-            <p class="muted">No class rep responses have been posted yet.</p>
+            <p class="muted">No responses yet.</p>
         </div>
     {% endif %}
 </section>

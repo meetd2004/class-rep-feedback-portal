@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}{{ status_code }} {{ title }} · Class Rep Feedback Portal{% endblock %}
+{% block title %}{{ status_code }} {{ title }} · RepDesk{% endblock %}
 
 {% block content %}
 <section class="card error-card">
     <span class="error-code">HTTP {{ status_code }}</span>
     <h1>{{ title }}</h1>
     <p class="muted">{{ message }}</p>
-    <a href="{{ url_for('auth.index') }}" class="btn btn-primary">Return to Portal</a>
+    <a href="{{ url_for('auth.index') }}" class="btn btn-primary">Return to Dashboard</a>
 </section>
 {% endblock %}
