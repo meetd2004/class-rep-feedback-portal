@@ -64,12 +64,17 @@
         </div>
     </header>
 
+    {% block hero %}{% endblock %}
+
     <main class="container main-content">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-stack" role="status" aria-live="polite">
                     {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                        <div class="alert alert-{{ category }} alert-dismissible">
+                            <span>{{ message }}</span>
+                            <button type="button" class="alert-close" data-dismiss-alert aria-label="Dismiss notification">&times;</button>
+                        </div>
                     {% endfor %}
                 </div>
             {% endif %}
@@ -77,6 +82,17 @@
 
         {% block content %}{% endblock %}
     </main>
+
+    <div id="confirm-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" hidden>
+        <div class="modal-card">
+            <h2 id="confirm-modal-title">Confirm Deletion</h2>
+            <p id="confirm-modal-message" class="muted"></p>
+            <div class="modal-actions">
+                <button type="button" id="confirm-modal-cancel" class="btn btn-secondary">Cancel</button>
+                <button type="button" id="confirm-modal-proceed" class="btn btn-danger">Delete Permanently</button>
+            </div>
+        </div>
+    </div>
 
     <footer class="site-footer">
         <div class="container footer-inner">

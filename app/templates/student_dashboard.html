@@ -34,8 +34,25 @@
 
 <section class="card table-card">
     {% if submissions %}
+        <div class="dashboard-toolbar">
+            <div class="search-wrap">
+                <input
+                    id="student-search"
+                    type="search"
+                    placeholder="Filter submissions by title or category..."
+                    aria-label="Filter submissions by title or category"
+                >
+            </div>
+            <div class="status-filter-pills" role="group" aria-label="Filter by status">
+                <button type="button" class="filter-pill active" data-status-filter="all">All</button>
+                <button type="button" class="filter-pill" data-status-filter="new">New</button>
+                <button type="button" class="filter-pill" data-status-filter="in-review">In Review</button>
+                <button type="button" class="filter-pill" data-status-filter="resolved">Resolved</button>
+            </div>
+        </div>
+
         <div class="table-wrap">
-            <table class="data-table">
+            <table class="data-table" id="student-submissions-table">
                 <thead>
                     <tr>
                         <th>Title</th>
@@ -48,7 +65,11 @@
                 </thead>
                 <tbody>
                     {% for item in submissions %}
-                    <tr>
+                    <tr
+                        data-feedback-row
+                        data-status="{{ item.status|lower|replace(' ', '-') }}"
+                        data-search="{{ (item.title ~ ' ' ~ item.category)|lower }}"
+                    >
                         <td>
                             <a href="{{ url_for('student.view_feedback', feedback_id=item.id) }}" class="row-link">
                                 {{ item.title }}
@@ -83,6 +104,9 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+        <div id="student-filter-empty" class="empty-state compact" hidden>
+            <p class="muted">No submissions match your search or status filter.</p>
         </div>
     {% else %}
         <div class="empty-state">
