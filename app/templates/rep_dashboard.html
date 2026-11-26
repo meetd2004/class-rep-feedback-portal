@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Feedback Queue · RepDesk{% endblock %}
+{% block title %}Feedback Queue · RepDesk Admin{% endblock %}
 
 {% block content %}
 <section class="page-head">
@@ -7,7 +7,7 @@
         <span class="eyebrow">{{ g.user.cohort }}</span>
         <h1>Feedback Queue</h1>
         <p class="muted">
-            Review cohort submissions, provide updates, and track resolution status.
+            Review incoming student tickets, triage by topic or status, and publish official responses.
         </p>
     </div>
 </section>
@@ -15,23 +15,30 @@
 <section class="stats-grid" aria-label="Cohort Queue Summary">
     <a href="{{ url_for('rep.dashboard') }}" class="stat-card stat-link {{ 'stat-active' if not selected_status else '' }}">
         <span class="stat-label">Total Submissions</span>
-        <strong class="stat-value">{{ counts.total }}</strong>
+        <strong class="stat-value" data-stat-count="total">{{ counts.total }}</strong>
     </a>
     <a href="{{ url_for('rep.dashboard', status='New', category=selected_category or None) }}" class="stat-card stat-link {{ 'stat-active' if selected_status == 'New' else '' }}">
         <span class="stat-label">New</span>
-        <strong class="stat-value stat-new">{{ counts['New'] }}</strong>
+        <strong class="stat-value stat-new" data-stat-count="New">{{ counts['New'] }}</strong>
     </a>
     <a href="{{ url_for('rep.dashboard', status='In Review', category=selected_category or None) }}" class="stat-card stat-link {{ 'stat-active' if selected_status == 'In Review' else '' }}">
         <span class="stat-label">In Review</span>
-        <strong class="stat-value stat-review">{{ counts['In Review'] }}</strong>
+        <strong class="stat-value stat-review" data-stat-count="In Review">{{ counts['In Review'] }}</strong>
     </a>
     <a href="{{ url_for('rep.dashboard', status='Resolved', category=selected_category or None) }}" class="stat-card stat-link {{ 'stat-active' if selected_status == 'Resolved' else '' }}">
         <span class="stat-label">Resolved</span>
-        <strong class="stat-value stat-resolved">{{ counts['Resolved'] }}</strong>
+        <strong class="stat-value stat-resolved" data-stat-count="Resolved">{{ counts['Resolved'] }}</strong>
     </a>
 </section>
 
-<section class="card table-card">
+<section
+    class="card table-card"
+    id="rep-queue-card"
+    data-active-category="{{ selected_category }}"
+    data-active-status="{{ selected_status }}"
+    data-active-query="{{ search_query }}"
+    data-latest-ticket-id="{{ latest_ticket_id }}"
+>
     <form action="{{ url_for('rep.dashboard') }}" method="get" class="filter-bar">
         <div class="filter-group filter-search">
             <label for="q">Search</label>
@@ -75,63 +82,71 @@
 
     {% if selected_category or selected_status or search_query %}
         <div class="filter-summary">
-            <span class="muted">Showing <strong>{{ submissions|length }}</strong> of {{ counts.total }} cohort submissions</span>
+            <span class="muted">Showing <strong id="rep-filtered-count">{{ submissions|length }}</strong> of <span data-stat-count="total">{{ counts.total }}</span> cohort submissions</span>
         </div>
     {% endif %}
 
-    {% if submissions %}
-        <div class="table-wrap">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Submitted By</th>
-                        <th>Category</th>
-                        <th>Status</th>
-                        <th>Responses</th>
-                        <th>Updated</th>
-                        <th class="actions-col">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in submissions %}
-                    <tr>
-                        <td>
-                            <a href="{{ url_for('rep.view_feedback', feedback_id=item.id) }}" class="row-link">
-                                {{ item.title }}
-                            </a>
-                        </td>
-                        <td>{{ item.author_name }}</td>
-                        <td><span class="badge-category">{{ item.category }}</span></td>
-                        <td>
-                            <span class="status-pill status-{{ item.status|lower|replace(' ', '-') }}">
-                                {{ item.status }}
-                            </span>
-                        </td>
-                        <td>{{ item.response_count }}</td>
-                        <td class="muted nowrap">{{ item.updated_at }}</td>
-                        <td class="actions-cell">
-                            <a href="{{ url_for('rep.view_feedback', feedback_id=item.id) }}" class="btn btn-secondary btn-sm">Review</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    {% else %}
-        <div class="empty-state">
-            <h2>No submissions match your filters</h2>
-            <p class="muted">
-                {% if selected_category or selected_status or search_query %}
-                    Adjust or reset the active search, category, and status filters.
-                {% else %}
-                    There are currently no submissions for {{ g.user.cohort }}.
-                {% endif %}
-            </p>
+    <div class="table-wrap" id="rep-queue-table-wrap" {% if not submissions %}hidden{% endif %}>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Ticket</th>
+                    <th>Title</th>
+                    <th>Submitted By</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Responses</th>
+                    <th>Updated</th>
+                    <th class="actions-col">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="rep-queue-tbody">
+                {% for item in submissions %}
+                <tr>
+                    <td><span class="ticket-id-badge">#{{ item.id }}</span></td>
+                    <td>
+                        <a href="{{ url_for('rep.view_feedback', feedback_id=item.id) }}" class="row-link">
+                            {{ item.title }}
+                        </a>
+                    </td>
+                    <td>{{ item.author_name }}</td>
+                    <td><span class="badge-category">{{ item.category }}</span></td>
+                    <td>
+                        <span class="status-pill status-{{ item.status|lower|replace(' ', '-') }}">
+                            {{ item.status }}
+                        </span>
+                    </td>
+                    <td>{{ item.response_count }}</td>
+                    <td class="muted nowrap">{{ item.updated_at }}</td>
+                    <td class="actions-cell">
+                        <a href="{{ url_for('rep.view_feedback', feedback_id=item.id) }}" class="btn btn-secondary btn-sm">Review</a>
+                        {% if item.status == 'New' %}
+                            <form action="{{ url_for('rep.update_status', feedback_id=item.id) }}" method="post" class="inline-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="status" value="In Review">
+                                <input type="hidden" name="next" value="dashboard">
+                                <button type="submit" class="btn btn-primary btn-sm">Start Review</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="empty-state" id="rep-queue-empty" {% if submissions %}hidden{% endif %}>
+        <h2>No submissions match your filters</h2>
+        <p class="muted">
             {% if selected_category or selected_status or search_query %}
-                <a href="{{ url_for('rep.dashboard') }}" class="btn btn-secondary">Reset Filters</a>
+                Adjust or reset the active search, category, and status filters.
+            {% else %}
+                There are currently no submissions for {{ g.user.cohort }}.
             {% endif %}
-        </div>
-    {% endif %}
+        </p>
+        {% if selected_category or selected_status or search_query %}
+            <a href="{{ url_for('rep.dashboard') }}" class="btn btn-secondary">Reset Filters</a>
+        {% endif %}
+    </div>
 </section>
 {% endblock %}

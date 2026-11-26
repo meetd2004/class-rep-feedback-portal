@@ -235,3 +235,55 @@ def test_student_and_rep_render_distinct_interfaces(client) -> None:
 
     rep_detail_html = client.get("/rep/feedback/1").get_data(as_text=True)
     assert "admin-triage-grid" in rep_detail_html
+
+
+def test_student_submission_raises_live_ticket_in_admin_queue_and_sidebar_views(app, client) -> None:
+    # Student submits a brand new feedback item
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    token = extract_csrf_token(client.get("/feedback/new").get_data(as_text=True))
+    client.post(
+        "/feedback/new",
+        data={
+            "csrf_token": token,
+            "title": "Projector HDMI cable faulty in Lab 4",
+            "category": "Learning Resources",
+            "description": "The HDMI adapter in Lab 4 disconnects intermittently during tutorials.",
+        },
+        follow_redirects=True,
+    )
+    logout_tok = extract_csrf_token(client.get("/student/dashboard").get_data(as_text=True))
+    client.post("/logout", data={"csrf_token": logout_tok})
+
+    # Rep signs into Admin Console and verifies live JSON sync, sidebar counts, and quick triage
+    login_as(client, "niamh.gallagher@nci-demo.example", "RepDemo!2026")
+    api_resp = client.get("/rep/api/queue-summary")
+    assert api_resp.status_code == 200
+    payload = api_resp.get_json()
+    assert payload["latest_ticket"]["title"] == "Projector HDMI cable faulty in Lab 4"
+    assert payload["counts"]["New"] >= 3
+    assert payload["counts"]["categories"]["Learning Resources"] >= 2
+
+    # All sidebar Queue Views & Topic links return 200 and show matching tickets
+    for path in (
+        "/rep/dashboard?status=New",
+        "/rep/dashboard?status=In%20Review",
+        "/rep/dashboard?status=Resolved",
+        "/rep/dashboard?category=Lectures",
+        "/rep/dashboard?category=Assessments",
+        "/rep/dashboard?category=Timetables",
+        "/rep/dashboard?category=Learning%20Resources",
+    ):
+        assert client.get(path).status_code == 200
+
+    # Quick Start Review from dashboard transitions ticket to In Review
+    new_id = payload["latest_ticket"]["id"]
+    dash_html = client.get("/rep/dashboard?status=New").get_data(as_text=True)
+    assert "Projector HDMI cable faulty in Lab 4" in dash_html
+    dash_token = extract_csrf_token(dash_html)
+    triage_resp = client.post(
+        f"/rep/feedback/{new_id}/status",
+        data={"csrf_token": dash_token, "status": "In Review", "next": "dashboard"},
+        follow_redirects=True,
+    )
+    assert triage_resp.status_code == 200
+    assert "Submission status updated to In Review." in triage_resp.get_data(as_text=True)

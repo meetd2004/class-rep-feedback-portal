@@ -1,8 +1,11 @@
-"""Class rep workflow routes: filtered cohort queue, responses, and status progression."""
+"""Class rep workflow routes: filtered cohort queue, live sync API, responses, and status progression."""
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
+import sqlite3
+from typing import Any
+
+from flask import Blueprint, abort, current_app, flash, g, jsonify, redirect, render_template, request, url_for
 
 from app.db import get_db, utc_now_iso
 from app.routes import render_feedback_detail
@@ -21,10 +24,39 @@ def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-@rep_bp.route("/dashboard")
-@role_required("rep")
-def dashboard() -> str:
-    """Display all feedback for the rep's assigned cohort with safe filters and search."""
+def get_rep_queue_counts(cohort: str) -> dict[str, Any]:
+    """Return status and category counts scoped strictly to the given cohort."""
+    db = get_db()
+    categories = current_app.config["ALLOWED_CATEGORIES"]
+    counts: dict[str, Any] = {
+        "total": 0,
+        "New": 0,
+        "In Review": 0,
+        "Resolved": 0,
+        "categories": {cat: 0 for cat in categories},
+    }
+
+    status_rows = db.execute(
+        "SELECT status, COUNT(*) AS cnt FROM feedback WHERE cohort = ? GROUP BY status;",
+        (cohort,),
+    ).fetchall()
+    for row in status_rows:
+        counts[row["status"]] = int(row["cnt"])
+        counts["total"] += int(row["cnt"])
+
+    cat_rows = db.execute(
+        "SELECT category, COUNT(*) AS cnt FROM feedback WHERE cohort = ? GROUP BY category;",
+        (cohort,),
+    ).fetchall()
+    for row in cat_rows:
+        if row["category"] in counts["categories"]:
+            counts["categories"][row["category"]] = int(row["cnt"])
+
+    return counts
+
+
+def _parse_queue_filters() -> tuple[str, str, str]:
+    """Read and allow-list validate category, status, and search query filters."""
     categories = current_app.config["ALLOWED_CATEGORIES"]
     statuses = current_app.config["ALLOWED_STATUSES"]
 
@@ -37,21 +69,19 @@ def dashboard() -> str:
     if selected_status not in statuses:
         selected_status = ""
 
+    return selected_category, selected_status, search_query
+
+
+def _fetch_queue_submissions(
+    cohort: str,
+    selected_category: str,
+    selected_status: str,
+    search_query: str,
+) -> list[sqlite3.Row]:
+    """Fetch filtered feedback rows for the assigned cohort using parameterised SQL."""
     like_pattern = f"%{_escape_like(search_query.lower())}%" if search_query else ""
-
     db = get_db()
-
-    # Summary counts across the entire assigned cohort
-    summary_rows = db.execute(
-        "SELECT status, COUNT(*) AS cnt FROM feedback WHERE cohort = ? GROUP BY status;",
-        (g.user["cohort"],),
-    ).fetchall()
-    counts = {"total": 0, "New": 0, "In Review": 0, "Resolved": 0}
-    for row in summary_rows:
-        counts[row["status"]] = row["cnt"]
-        counts["total"] += row["cnt"]
-
-    submissions = db.execute(
+    return db.execute(
         """
         SELECT
             f.id,
@@ -79,11 +109,10 @@ def dashboard() -> str:
                 WHEN 'In Review' THEN 2
                 ELSE 3
             END,
-            f.updated_at DESC,
             f.id DESC;
         """,
         (
-            g.user["cohort"],
+            cohort,
             selected_category,
             selected_category,
             selected_status,
@@ -95,6 +124,21 @@ def dashboard() -> str:
         ),
     ).fetchall()
 
+
+@rep_bp.route("/dashboard")
+@role_required("rep")
+def dashboard() -> str:
+    """Display all feedback for the rep's assigned cohort with safe filters and search."""
+    categories = current_app.config["ALLOWED_CATEGORIES"]
+    statuses = current_app.config["ALLOWED_STATUSES"]
+    selected_category, selected_status, search_query = _parse_queue_filters()
+
+    counts = get_rep_queue_counts(g.user["cohort"])
+    submissions = _fetch_queue_submissions(
+        g.user["cohort"], selected_category, selected_status, search_query
+    )
+    latest_ticket_id = max((int(row["id"]) for row in submissions), default=0)
+
     return render_template(
         "rep_dashboard.html",
         submissions=submissions,
@@ -104,6 +148,64 @@ def dashboard() -> str:
         selected_status=selected_status,
         search_query=search_query,
         counts=counts,
+        latest_ticket_id=latest_ticket_id,
+    )
+
+
+@rep_bp.route("/api/queue-summary")
+@role_required("rep")
+def queue_summary_api() -> object:
+    """Return live cohort ticket counts and filtered queue items for interactive polling."""
+    selected_category, selected_status, search_query = _parse_queue_filters()
+    cohort = g.user["cohort"]
+    counts = get_rep_queue_counts(cohort)
+    submissions = _fetch_queue_submissions(
+        cohort, selected_category, selected_status, search_query
+    )
+
+    db = get_db()
+    latest_row = db.execute(
+        """
+        SELECT f.id, f.title, f.category, f.status, u.full_name AS author_name
+        FROM feedback AS f
+        JOIN users AS u ON u.id = f.author_id
+        WHERE f.cohort = ?
+        ORDER BY f.id DESC
+        LIMIT 1;
+        """,
+        (cohort,),
+    ).fetchone()
+
+    tickets = [
+        {
+            "id": int(row["id"]),
+            "title": row["title"],
+            "author_name": row["author_name"],
+            "category": row["category"],
+            "status": row["status"],
+            "response_count": int(row["response_count"]),
+            "updated_at": row["updated_at"],
+            "detail_url": url_for("rep.view_feedback", feedback_id=row["id"]),
+            "status_url": url_for("rep.update_status", feedback_id=row["id"]),
+        }
+        for row in submissions
+    ]
+
+    return jsonify(
+        {
+            "counts": counts,
+            "latest_ticket": {
+                "id": int(latest_row["id"]),
+                "title": latest_row["title"],
+                "category": latest_row["category"],
+                "status": latest_row["status"],
+                "author_name": latest_row["author_name"],
+                "detail_url": url_for("rep.view_feedback", feedback_id=latest_row["id"]),
+            }
+            if latest_row
+            else None,
+            "tickets": tickets,
+        }
     )
 
 
@@ -177,4 +279,6 @@ def update_status(feedback_id: int) -> object:
     db.commit()
 
     flash(f"Submission status updated to {target_status}.", "success")
+    if request.form.get("next") == "dashboard":
+        return redirect(url_for("rep.dashboard"))
     return redirect(url_for("rep.view_feedback", feedback_id=feedback_id))

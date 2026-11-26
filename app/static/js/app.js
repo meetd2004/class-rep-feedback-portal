@@ -300,4 +300,217 @@ document.addEventListener("DOMContentLoaded", () => {
         textarea.addEventListener("input", updateCount);
         updateCount();
     });
+
+    // 9. Class Rep Admin Console Live Ticket Sync
+    const adminShell = document.getElementById("admin-shell");
+    if (adminShell) {
+        const pollUrl = adminShell.getAttribute("data-rep-poll-url");
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfMeta ? csrfMeta.getAttribute("content") || "" : "";
+        const queueCard = document.getElementById("rep-queue-card");
+        const queueTbody = document.getElementById("rep-queue-tbody");
+        const queueTableWrap = document.getElementById("rep-queue-table-wrap");
+        const queueEmpty = document.getElementById("rep-queue-empty");
+        const filteredCountEl = document.getElementById("rep-filtered-count");
+        const liveAlert = document.getElementById("admin-live-alert");
+        const liveAlertText = document.getElementById("admin-live-alert-text");
+        const liveAlertLink = document.getElementById("admin-live-alert-link");
+        const liveAlertDismiss = document.getElementById("admin-live-alert-dismiss");
+
+        let knownLatestId = queueCard
+            ? parseInt(queueCard.getAttribute("data-latest-ticket-id") || "0", 10)
+            : 0;
+
+        if (liveAlertDismiss && liveAlert) {
+            liveAlertDismiss.addEventListener("click", () => {
+                liveAlert.hidden = true;
+            });
+        }
+
+        const buildStatusClass = (statusText) =>
+            "status-pill status-" + statusText.toLowerCase().replace(/\s+/g, "-");
+
+        const renderQueueRows = (tickets) => {
+            if (!queueTbody || !queueTableWrap || !queueEmpty) {
+                return;
+            }
+            queueTbody.replaceChildren();
+
+            if (!tickets.length) {
+                queueTableWrap.hidden = true;
+                queueEmpty.hidden = false;
+                return;
+            }
+
+            queueTableWrap.hidden = false;
+            queueEmpty.hidden = true;
+
+            tickets.forEach((ticket) => {
+                const tr = document.createElement("tr");
+
+                const tdId = document.createElement("td");
+                const idSpan = document.createElement("span");
+                idSpan.className = "ticket-id-badge";
+                idSpan.textContent = "#" + String(ticket.id);
+                tdId.appendChild(idSpan);
+                tr.appendChild(tdId);
+
+                const tdTitle = document.createElement("td");
+                const titleLink = document.createElement("a");
+                titleLink.className = "row-link";
+                titleLink.href = ticket.detail_url;
+                titleLink.textContent = ticket.title;
+                tdTitle.appendChild(titleLink);
+                tr.appendChild(tdTitle);
+
+                const tdAuthor = document.createElement("td");
+                tdAuthor.textContent = ticket.author_name;
+                tr.appendChild(tdAuthor);
+
+                const tdCat = document.createElement("td");
+                const catSpan = document.createElement("span");
+                catSpan.className = "badge-category";
+                catSpan.textContent = ticket.category;
+                tdCat.appendChild(catSpan);
+                tr.appendChild(tdCat);
+
+                const tdStatus = document.createElement("td");
+                const stSpan = document.createElement("span");
+                stSpan.className = buildStatusClass(ticket.status);
+                stSpan.textContent = ticket.status;
+                tdStatus.appendChild(stSpan);
+                tr.appendChild(tdStatus);
+
+                const tdResp = document.createElement("td");
+                tdResp.textContent = String(ticket.response_count);
+                tr.appendChild(tdResp);
+
+                const tdUpdated = document.createElement("td");
+                tdUpdated.className = "muted nowrap";
+                tdUpdated.textContent = ticket.updated_at;
+                tr.appendChild(tdUpdated);
+
+                const tdActions = document.createElement("td");
+                tdActions.className = "actions-cell";
+
+                const reviewLink = document.createElement("a");
+                reviewLink.className = "btn btn-secondary btn-sm";
+                reviewLink.href = ticket.detail_url;
+                reviewLink.textContent = "Review";
+                tdActions.appendChild(reviewLink);
+
+                if (ticket.status === "New" && csrfToken) {
+                    const form = document.createElement("form");
+                    form.method = "post";
+                    form.action = ticket.status_url;
+                    form.className = "inline-form";
+
+                    const csrfInput = document.createElement("input");
+                    csrfInput.type = "hidden";
+                    csrfInput.name = "csrf_token";
+                    csrfInput.value = csrfToken;
+                    form.appendChild(csrfInput);
+
+                    const statusInput = document.createElement("input");
+                    statusInput.type = "hidden";
+                    statusInput.name = "status";
+                    statusInput.value = "In Review";
+                    form.appendChild(statusInput);
+
+                    const nextInput = document.createElement("input");
+                    nextInput.type = "hidden";
+                    nextInput.name = "next";
+                    nextInput.value = "dashboard";
+                    form.appendChild(nextInput);
+
+                    const startBtn = document.createElement("button");
+                    startBtn.type = "submit";
+                    startBtn.className = "btn btn-primary btn-sm";
+                    startBtn.textContent = "Start Review";
+                    form.appendChild(startBtn);
+
+                    tdActions.appendChild(form);
+                }
+
+                tr.appendChild(tdActions);
+                queueTbody.appendChild(tr);
+            });
+        };
+
+        const syncAdminQueue = async () => {
+            if (!pollUrl) {
+                return;
+            }
+            const params = new URLSearchParams();
+            if (queueCard) {
+                const cat = queueCard.getAttribute("data-active-category") || "";
+                const st = queueCard.getAttribute("data-active-status") || "";
+                const q = queueCard.getAttribute("data-active-query") || "";
+                if (cat) params.set("category", cat);
+                if (st) params.set("status", st);
+                if (q) params.set("q", q);
+            }
+            const targetUrl = params.toString() ? `${pollUrl}?${params.toString()}` : pollUrl;
+
+            try {
+                const response = await fetch(targetUrl, {
+                    headers: { Accept: "application/json" },
+                    cache: "no-store",
+                });
+                if (!response.ok) {
+                    return;
+                }
+                const data = await response.json();
+                const counts = data.counts || {};
+
+                document.querySelectorAll("[data-sidebar-count]").forEach((el) => {
+                    const key = el.getAttribute("data-sidebar-count");
+                    if (key && key in counts) {
+                        el.textContent = String(counts[key]);
+                    }
+                });
+                document.querySelectorAll("[data-stat-count]").forEach((el) => {
+                    const key = el.getAttribute("data-stat-count");
+                    if (key && key in counts) {
+                        el.textContent = String(counts[key]);
+                    }
+                });
+                const catCounts = counts.categories || {};
+                document.querySelectorAll("[data-sidebar-cat]").forEach((el) => {
+                    const cat = el.getAttribute("data-sidebar-cat");
+                    if (cat && cat in catCounts) {
+                        el.textContent = String(catCounts[cat]);
+                    }
+                });
+
+                if (filteredCountEl && Array.isArray(data.tickets)) {
+                    filteredCountEl.textContent = String(data.tickets.length);
+                }
+
+                if (Array.isArray(data.tickets)) {
+                    renderQueueRows(data.tickets);
+                }
+
+                const latest = data.latest_ticket;
+                if (latest && latest.id) {
+                    if (knownLatestId === 0) {
+                        knownLatestId = latest.id;
+                    } else if (latest.id > knownLatestId) {
+                        knownLatestId = latest.id;
+                        if (liveAlert && liveAlertText && liveAlertLink) {
+                            liveAlertText.textContent =
+                                `New student ticket #${latest.id} (${latest.category}) from ${latest.author_name}: "${latest.title}"`;
+                            liveAlertLink.href = latest.detail_url;
+                            liveAlert.hidden = false;
+                        }
+                    }
+                }
+            } catch (_err) {
+                // Ignore transient polling hiccups silently
+            }
+        };
+
+        window.setInterval(syncAdminQueue, 4000);
+        syncAdminQueue();
+    }
 });

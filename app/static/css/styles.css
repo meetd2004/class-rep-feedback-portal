@@ -1383,13 +1383,40 @@ textarea:focus {
 }
 
 .admin-nav-link {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
     color: #cbd5e1;
     font-size: 0.9rem;
     font-weight: 500;
     padding: 0.55rem 0.75rem;
     border-radius: 8px;
     transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 20px;
+    padding: 0 0.45rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+}
+
+.sidebar-count-new {
+    background: rgba(59, 130, 246, 0.3);
+    color: #bfdbfe;
+}
+
+.admin-nav-link.active .sidebar-count {
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
 }
 
 .admin-nav-link:hover {
@@ -1452,6 +1479,69 @@ textarea:focus {
     justify-content: space-between;
     gap: 1rem;
     flex-wrap: wrap;
+}
+
+.admin-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+}
+
+.live-sync-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #065f46;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    padding: 0.26rem 0.7rem;
+    border-radius: 999px;
+}
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #10b981;
+    animation: livePulse 1.8s infinite;
+}
+
+@keyframes livePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+.admin-live-alert {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.admin-live-alert[hidden] {
+    display: none;
+}
+
+.admin-live-alert-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.ticket-id-badge {
+    display: inline-block;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #4f46e5;
+    background: #eef2ff;
+    padding: 0.18rem 0.5rem;
+    border-radius: 6px;
 }
 
 .admin-env-badge {

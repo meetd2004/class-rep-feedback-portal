@@ -30,8 +30,17 @@ def create_app(test_config: dict[str, Any] | type[Config] | None = None) -> Flas
     app.teardown_appcontext(close_db)
 
     from app.routes import register_blueprints
+    from app.routes.rep import get_rep_queue_counts
 
     register_blueprints(app)
+
+    @app.context_processor
+    def inject_rep_sidebar_counts() -> dict[str, Any]:
+        """Provide live cohort ticket counts across all Admin Console pages."""
+        user = g.get("user")
+        if user is not None and user["role"] == "rep":
+            return {"rep_sidebar_counts": get_rep_queue_counts(user["cohort"])}
+        return {"rep_sidebar_counts": None}
 
     @app.after_request
     def apply_security_headers(response: Response) -> Response:

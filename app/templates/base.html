@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}RepDesk · Class Rep Feedback Portal{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </head>
 <body class="{{ 'theme-admin' if g.user and g.user.role == 'rep' else 'theme-student' }}">
     {% if g.user and g.user.role == 'rep' %}
-    <div class="admin-shell">
+    <div
+        class="admin-shell"
+        id="admin-shell"
+        data-rep-poll-url="{{ url_for('rep.queue_summary_api') }}"
+    >
         <aside class="admin-sidebar" aria-label="Admin Navigation">
             <div class="admin-sidebar-top">
                 <a href="{{ url_for('rep.dashboard') }}" class="brand">
@@ -32,25 +37,29 @@
                             href="{{ url_for('rep.dashboard') }}"
                             class="admin-nav-link {{ 'active' if request.endpoint == 'rep.dashboard' and not request.args.get('status') and not request.args.get('category') else '' }}"
                         >
-                            All Cohort Tickets
+                            <span>All Cohort Tickets</span>
+                            <span class="sidebar-count" data-sidebar-count="total">{{ rep_sidebar_counts.total if rep_sidebar_counts else 0 }}</span>
                         </a>
                         <a
                             href="{{ url_for('rep.dashboard', status='New') }}"
                             class="admin-nav-link {{ 'active' if request.args.get('status') == 'New' else '' }}"
                         >
-                            Needs Triage (New)
+                            <span>Needs Triage (New)</span>
+                            <span class="sidebar-count sidebar-count-new" data-sidebar-count="New">{{ rep_sidebar_counts['New'] if rep_sidebar_counts else 0 }}</span>
                         </a>
                         <a
                             href="{{ url_for('rep.dashboard', status='In Review') }}"
                             class="admin-nav-link {{ 'active' if request.args.get('status') == 'In Review' else '' }}"
                         >
-                            In Review
+                            <span>In Review</span>
+                            <span class="sidebar-count" data-sidebar-count="In Review">{{ rep_sidebar_counts['In Review'] if rep_sidebar_counts else 0 }}</span>
                         </a>
                         <a
                             href="{{ url_for('rep.dashboard', status='Resolved') }}"
                             class="admin-nav-link {{ 'active' if request.args.get('status') == 'Resolved' else '' }}"
                         >
-                            Resolved
+                            <span>Resolved</span>
+                            <span class="sidebar-count" data-sidebar-count="Resolved">{{ rep_sidebar_counts['Resolved'] if rep_sidebar_counts else 0 }}</span>
                         </a>
                     </nav>
                 </div>
@@ -63,7 +72,8 @@
                                 href="{{ url_for('rep.dashboard', category=cat) }}"
                                 class="admin-nav-link {{ 'active' if request.args.get('category') == cat else '' }}"
                             >
-                                {{ cat }}
+                                <span>{{ cat }}</span>
+                                <span class="sidebar-count" data-sidebar-cat="{{ cat }}">{{ rep_sidebar_counts.categories.get(cat, 0) if rep_sidebar_counts else 0 }}</span>
                             </a>
                         {% endfor %}
                     </nav>
@@ -88,12 +98,26 @@
         <div class="admin-workspace">
             <header class="admin-topbar">
                 <div class="admin-topbar-inner">
-                    <span class="admin-env-badge">Representative Management Console</span>
-                    <span class="muted">Scoped to {{ g.user.cohort }}</span>
+                    <div class="admin-topbar-left">
+                        <span class="admin-env-badge">Representative Management Console</span>
+                        <span class="muted">Scoped to {{ g.user.cohort }}</span>
+                    </div>
+                    <div class="live-sync-pill" id="live-sync-status">
+                        <span class="live-dot" aria-hidden="true"></span>
+                        <span>Live Sync Active</span>
+                    </div>
                 </div>
             </header>
 
             <main class="admin-main">
+                <div id="admin-live-alert" class="alert alert-info admin-live-alert" role="status" hidden>
+                    <div id="admin-live-alert-text"></div>
+                    <div class="admin-live-alert-actions">
+                        <a href="#" id="admin-live-alert-link" class="btn btn-primary btn-sm">Open Ticket</a>
+                        <button type="button" id="admin-live-alert-dismiss" class="alert-close" aria-label="Dismiss alert">&times;</button>
+                    </div>
+                </div>
+
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         <div class="flash-stack" role="status" aria-live="polite">
