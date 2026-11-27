@@ -2,39 +2,146 @@
 {% block title %}My Feedback · RepDesk{% endblock %}
 
 {% block content %}
-<section class="page-head">
-    <div>
-        <span class="eyebrow">{{ g.user.cohort }}</span>
-        <h1>My Feedback</h1>
-        <p class="muted">
-            Submit course feedback privately and track responses from your class representative.
-        </p>
-    </div>
-    <a href="{{ url_for('student.create_feedback') }}" class="btn btn-primary">+ New Feedback</a>
-</section>
+<div
+    id="student-dashboard-shell"
+    data-student-poll-url="{{ url_for('student.my_feedback_api') }}"
+>
+    <section class="page-head">
+        <div>
+            <span class="eyebrow">{{ g.user.cohort }}</span>
+            <h1>My Feedback</h1>
+            <p class="muted">
+                Raise class requests or feedback privately and follow live updates from your class representative.
+            </p>
+        </div>
+        <div class="page-head-actions">
+            <div class="live-sync-pill" id="student-live-sync">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span>Live Sync Active</span>
+            </div>
+            <a href="{{ url_for('student.create_feedback') }}" class="btn btn-secondary">Full Form</a>
+        </div>
+    </section>
 
-<section class="stats-grid" aria-label="Submission Summary">
-    <div class="stat-card">
-        <span class="stat-label">Total Submitted</span>
-        <strong class="stat-value">{{ counts.total }}</strong>
+    <div id="student-live-alert" class="alert alert-info admin-live-alert" role="status" hidden>
+        <div id="student-live-alert-text"></div>
+        <div class="admin-live-alert-actions">
+            <a href="#" id="student-live-alert-link" class="btn btn-primary btn-sm">View Update</a>
+            <button type="button" id="student-live-alert-dismiss" class="alert-close" aria-label="Dismiss notification">&times;</button>
+        </div>
     </div>
-    <div class="stat-card">
-        <span class="stat-label">New</span>
-        <strong class="stat-value stat-new">{{ counts['New'] }}</strong>
-    </div>
-    <div class="stat-card">
-        <span class="stat-label">In Review</span>
-        <strong class="stat-value stat-review">{{ counts['In Review'] }}</strong>
-    </div>
-    <div class="stat-card">
-        <span class="stat-label">Resolved</span>
-        <strong class="stat-value stat-resolved">{{ counts['Resolved'] }}</strong>
-    </div>
-</section>
 
-<section class="card table-card">
-    {% if submissions %}
-        <div class="dashboard-toolbar">
+    <section class="stats-grid" aria-label="Submission Summary">
+        <div class="stat-card">
+            <span class="stat-label">Total Submitted</span>
+            <strong class="stat-value" data-student-stat="total">{{ counts.total }}</strong>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">New</span>
+            <strong class="stat-value stat-new" data-student-stat="New">{{ counts['New'] }}</strong>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">In Review</span>
+            <strong class="stat-value stat-review" data-student-stat="In Review">{{ counts['In Review'] }}</strong>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">Resolved</span>
+            <strong class="stat-value stat-resolved" data-student-stat="Resolved">{{ counts['Resolved'] }}</strong>
+        </div>
+    </section>
+
+    <section class="card quick-composer-card" aria-labelledby="quick-composer-heading">
+        <div class="quick-composer-header">
+            <div>
+                <span class="eyebrow">Instant Submission</span>
+                <h2 id="quick-composer-heading">Raise a New Request or Feedback</h2>
+                <p class="muted">Submitted items start as <strong>New</strong> and appear immediately in the Class Rep Admin Console.</p>
+            </div>
+            <button
+                type="button"
+                id="toggle-quick-composer"
+                class="btn btn-primary btn-sm"
+                aria-expanded="true"
+                aria-controls="quick-composer-body"
+            >
+                Hide Form
+            </button>
+        </div>
+
+        <div id="quick-composer-body" class="quick-composer-body">
+            <div id="quick-composer-banner" class="alert alert-success" role="status" hidden></div>
+
+            <form
+                id="quick-request-form"
+                action="{{ url_for('student.create_feedback') }}"
+                method="post"
+                class="stack-form"
+                novalidate
+            >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" id="quick-category-input" name="category" value="Lectures">
+
+                <div class="form-group">
+                    <span class="form-label-text">Topic Category <span class="required">*</span></span>
+                    <div class="quick-cat-pills" role="radiogroup" aria-label="Topic Category">
+                        {% for cat in categories %}
+                            <button
+                                type="button"
+                                class="quick-cat-pill {{ 'active' if loop.first else '' }}"
+                                data-quick-cat="{{ cat }}"
+                                aria-pressed="{{ 'true' if loop.first else 'false' }}"
+                            >
+                                {{ cat }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                    <p id="quick-error-category" class="field-error" role="alert" hidden></p>
+                </div>
+
+                <div class="quick-form-grid">
+                    <div class="form-group">
+                        <label for="quick-title">Title <span class="required">*</span></label>
+                        <input
+                            id="quick-title"
+                            name="title"
+                            type="text"
+                            maxlength="120"
+                            placeholder="Brief summary of your request or concern (5–120 chars)"
+                            required
+                        >
+                        <p id="quick-error-title" class="field-error" role="alert" hidden></p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="quick-description">Details <span class="required">*</span></label>
+                    <textarea
+                        id="quick-description"
+                        name="description"
+                        rows="3"
+                        maxlength="2000"
+                        data-char-count="quick-description-counter"
+                        aria-describedby="quick-description-counter"
+                        placeholder="Describe the concern or suggestion clearly (15–2000 chars)..."
+                        required
+                    ></textarea>
+                    <div class="field-meta">
+                        <span class="muted" id="quick-description-counter">0 / 2000 characters</span>
+                    </div>
+                    <p id="quick-error-description" class="field-error" role="alert" hidden></p>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" id="quick-submit-btn" class="btn btn-primary">
+                        Submit Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="card table-card">
+        <div class="dashboard-toolbar" id="student-toolbar" {% if not submissions %}hidden{% endif %}>
             <div class="search-wrap">
                 <input
                     id="student-search"
@@ -51,10 +158,11 @@
             </div>
         </div>
 
-        <div class="table-wrap">
+        <div class="table-wrap" id="student-table-wrap" {% if not submissions %}hidden{% endif %}>
             <table class="data-table" id="student-submissions-table">
                 <thead>
                     <tr>
+                        <th>Ticket</th>
                         <th>Title</th>
                         <th>Category</th>
                         <th>Status</th>
@@ -63,13 +171,14 @@
                         <th class="actions-col">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="student-submissions-tbody">
                     {% for item in submissions %}
                     <tr
                         data-feedback-row
                         data-status="{{ item.status|lower|replace(' ', '-') }}"
                         data-search="{{ (item.title ~ ' ' ~ item.category)|lower }}"
                     >
+                        <td><span class="ticket-id-badge">#{{ item.id }}</span></td>
                         <td>
                             <a href="{{ url_for('student.view_feedback', feedback_id=item.id) }}" class="row-link">
                                 {{ item.title }}
@@ -105,17 +214,17 @@
                 </tbody>
             </table>
         </div>
+
         <div id="student-filter-empty" class="empty-state compact" hidden>
             <p class="muted">No submissions match your search or status filter.</p>
         </div>
-    {% else %}
-        <div class="empty-state">
+
+        <div class="empty-state" id="student-empty-state" {% if submissions %}hidden{% endif %}>
             <h2>No feedback submitted yet</h2>
             <p class="muted">
-                Raise a concern or suggestion regarding lectures, assessments, timetables, or learning resources.
+                Use the request form above to raise a concern or suggestion regarding lectures, assessments, timetables, or learning resources.
             </p>
-            <a href="{{ url_for('student.create_feedback') }}" class="btn btn-primary">Submit Feedback</a>
         </div>
-    {% endif %}
-</section>
+    </section>
+</div>
 {% endblock %}

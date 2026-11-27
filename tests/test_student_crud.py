@@ -270,3 +270,57 @@ def test_two_students_maintain_independent_crud_workflows(app, client) -> None:
     )
     assert del_res.status_code == 200
     assert "Feedback submission deleted." in del_res.get_data(as_text=True)
+
+
+def test_student_quick_request_ajax_and_live_sync_reflects_in_admin_queue(client) -> None:
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    dash_html = client.get("/student/dashboard").get_data(as_text=True)
+    assert "Raise a New Request or Feedback" in dash_html
+    token = extract_csrf_token(dash_html)
+
+    # Validation failure via fetch returns 400 JSON errors
+    bad_resp = client.post(
+        "/feedback/new",
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        data={
+            "csrf_token": token,
+            "title": "Bad",
+            "category": "Lectures",
+            "description": "Short",
+        },
+    )
+    assert bad_resp.status_code == 400
+    assert bad_resp.get_json()["ok"] is False
+
+    # Valid quick request submission returns 201 JSON ticket
+    ok_resp = client.post(
+        "/feedback/new",
+        headers={"X-Requested-With": "fetch", "Accept": "application/json"},
+        data={
+            "csrf_token": token,
+            "title": "Need recording captions enabled for Week 6",
+            "category": "Lectures",
+            "description": "Students would benefit from automated captions on Tuesday lecture recordings.",
+        },
+    )
+    assert ok_resp.status_code == 201
+    created_payload = ok_resp.get_json()
+    assert created_payload["ok"] is True
+    assert created_payload["ticket"]["status"] == "New"
+    created_id = created_payload["ticket"]["id"]
+
+    # Student live sync API sees the new ticket and excludes Ciaran's items
+    my_api = client.get("/student/api/my-feedback")
+    assert my_api.status_code == 200
+    titles = [item["title"] for item in my_api.get_json()["submissions"]]
+    assert "Need recording captions enabled for Week 6" in titles
+    assert "Room change notice needed for Thursday lab group" not in titles
+
+    # Switch to Class Rep Admin Console and verify ticket immediately appears in Admin live API
+    client.post("/logout", data={"csrf_token": token})
+    login_as(client, "niamh.gallagher@nci-demo.example", "RepDemo!2026")
+    admin_api = client.get("/rep/api/queue-summary")
+    assert admin_api.status_code == 200
+    admin_data = admin_api.get_json()
+    assert admin_data["latest_ticket"]["id"] == created_id
+    assert admin_data["latest_ticket"]["title"] == "Need recording captions enabled for Week 6"

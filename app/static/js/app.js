@@ -166,51 +166,54 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 4. Student Dashboard live search & status filter
+    // 4. Student Dashboard live search, status filter, quick composer, and real-time sync
     const searchInput = document.getElementById("student-search");
     const statusFilterButtons = document.querySelectorAll("[data-status-filter]");
-    const feedbackRows = document.querySelectorAll("[data-feedback-row]");
     const filterEmptyEl = document.getElementById("student-filter-empty");
+    let activeStudentStatus = "all";
 
-    if (feedbackRows.length && (searchInput || statusFilterButtons.length)) {
-        let activeStatus = "all";
-
-        const applyStudentFilters = () => {
-            const term = searchInput ? searchInput.value.trim().toLowerCase() : "";
-            let visibleCount = 0;
-
-            feedbackRows.forEach((row) => {
-                const rowStatus = row.getAttribute("data-status") || "";
-                const rowSearch = row.getAttribute("data-search") || "";
-                const statusMatch = activeStatus === "all" || rowStatus === activeStatus;
-                const textMatch = !term || rowSearch.includes(term);
-                const visible = statusMatch && textMatch;
-                row.hidden = !visible;
-                if (visible) {
-                    visibleCount += 1;
-                }
-            });
-
+    const applyStudentFilters = () => {
+        const feedbackRows = document.querySelectorAll("[data-feedback-row]");
+        if (!feedbackRows.length) {
             if (filterEmptyEl) {
-                filterEmptyEl.hidden = visibleCount > 0;
+                filterEmptyEl.hidden = true;
             }
-        };
-
-        if (searchInput) {
-            searchInput.addEventListener("input", applyStudentFilters);
+            return;
         }
+        const term = searchInput ? searchInput.value.trim().toLowerCase() : "";
+        let visibleCount = 0;
 
-        statusFilterButtons.forEach((btn) => {
-            btn.addEventListener("click", () => {
-                activeStatus = btn.getAttribute("data-status-filter") || "all";
-                statusFilterButtons.forEach((b) => b.classList.remove("active"));
-                btn.classList.add("active");
-                applyStudentFilters();
-            });
+        feedbackRows.forEach((row) => {
+            const rowStatus = row.getAttribute("data-status") || "";
+            const rowSearch = row.getAttribute("data-search") || "";
+            const statusMatch = activeStudentStatus === "all" || rowStatus === activeStudentStatus;
+            const textMatch = !term || rowSearch.includes(term);
+            const visible = statusMatch && textMatch;
+            row.hidden = !visible;
+            if (visible) {
+                visibleCount += 1;
+            }
         });
+
+        if (filterEmptyEl) {
+            filterEmptyEl.hidden = visibleCount > 0;
+        }
+    };
+
+    if (searchInput) {
+        searchInput.addEventListener("input", applyStudentFilters);
     }
 
-    // 5. Accessible In-Page Delete Confirmation Modal
+    statusFilterButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+            activeStudentStatus = btn.getAttribute("data-status-filter") || "all";
+            statusFilterButtons.forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            applyStudentFilters();
+        });
+    });
+
+    // 5. Accessible In-Page Delete Confirmation Modal (event-delegated for dynamically synced rows)
     const modal = document.getElementById("confirm-modal");
     const modalMsg = document.getElementById("confirm-modal-message");
     const modalCancel = document.getElementById("confirm-modal-cancel");
@@ -225,17 +228,20 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     if (modal && modalMsg && modalCancel && modalProceed) {
-        document.querySelectorAll("form[data-confirm-message]").forEach((form) => {
-            form.addEventListener("submit", (event) => {
-                if (form.getAttribute("data-confirmed") === "true") {
-                    return;
-                }
-                event.preventDefault();
-                pendingForm = form;
-                modalMsg.textContent = form.getAttribute("data-confirm-message") || "Are you sure?";
-                modal.hidden = false;
-                modalCancel.focus();
-            });
+        document.addEventListener("submit", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLFormElement)) {
+                return;
+            }
+            const confirmMsg = target.getAttribute("data-confirm-message");
+            if (!confirmMsg || target.getAttribute("data-confirmed") === "true") {
+                return;
+            }
+            event.preventDefault();
+            pendingForm = target;
+            modalMsg.textContent = confirmMsg;
+            modal.hidden = false;
+            modalCancel.focus();
         });
 
         modalCancel.addEventListener("click", closeModal);
@@ -510,7 +516,333 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         };
 
-        window.setInterval(syncAdminQueue, 4000);
+        window.setInterval(syncAdminQueue, 2500);
+        window.addEventListener("focus", syncAdminQueue);
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) {
+                syncAdminQueue();
+            }
+        });
         syncAdminQueue();
+    }
+
+    // 10. Student Portal Quick Request Composer & Real-Time Sync
+    const studentShell = document.getElementById("student-dashboard-shell");
+    if (studentShell) {
+        const studentPollUrl = studentShell.getAttribute("data-student-poll-url");
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = csrfMeta ? csrfMeta.getAttribute("content") || "" : "";
+
+        const toggleBtn = document.getElementById("toggle-quick-composer");
+        const composerBody = document.getElementById("quick-composer-body");
+        if (toggleBtn && composerBody) {
+            toggleBtn.addEventListener("click", () => {
+                const expanded = toggleBtn.getAttribute("aria-expanded") === "true";
+                toggleBtn.setAttribute("aria-expanded", expanded ? "false" : "true");
+                composerBody.hidden = expanded;
+                toggleBtn.textContent = expanded ? "+ Raise Request" : "Hide Form";
+            });
+        }
+
+        const catInput = document.getElementById("quick-category-input");
+        const catPills = document.querySelectorAll("[data-quick-cat]");
+        if (catInput && catPills.length) {
+            catPills.forEach((pill) => {
+                pill.addEventListener("click", () => {
+                    const chosen = pill.getAttribute("data-quick-cat") || "";
+                    catInput.value = chosen;
+                    catPills.forEach((btn) => {
+                        btn.classList.remove("active");
+                        btn.setAttribute("aria-pressed", "false");
+                    });
+                    pill.classList.add("active");
+                    pill.setAttribute("aria-pressed", "true");
+                });
+            });
+        }
+
+        const studentTbody = document.getElementById("student-submissions-tbody");
+        const studentTableWrap = document.getElementById("student-table-wrap");
+        const studentToolbar = document.getElementById("student-toolbar");
+        const studentEmpty = document.getElementById("student-empty-state");
+        const studentLiveAlert = document.getElementById("student-live-alert");
+        const studentLiveText = document.getElementById("student-live-alert-text");
+        const studentLiveLink = document.getElementById("student-live-alert-link");
+        const studentLiveDismiss = document.getElementById("student-live-alert-dismiss");
+
+        if (studentLiveDismiss && studentLiveAlert) {
+            studentLiveDismiss.addEventListener("click", () => {
+                studentLiveAlert.hidden = true;
+            });
+        }
+
+        const snapshotMap = new Map();
+        document.querySelectorAll("#student-submissions-tbody tr").forEach((tr) => {
+            const idBadge = tr.querySelector(".ticket-id-badge");
+            const statusPill = tr.querySelector(".status-pill");
+            const cells = tr.querySelectorAll("td");
+            if (idBadge && statusPill && cells.length >= 5) {
+                const idNum = parseInt(idBadge.textContent.replace("#", ""), 10);
+                snapshotMap.set(idNum, {
+                    status: statusPill.textContent.trim(),
+                    responses: parseInt(cells[4].textContent.trim(), 10) || 0,
+                });
+            }
+        });
+
+        const buildStudentStatusClass = (statusText) =>
+            "status-pill status-" + statusText.toLowerCase().replace(/\s+/g, "-");
+
+        const renderStudentRows = (items) => {
+            if (!studentTbody || !studentTableWrap || !studentEmpty || !studentToolbar) {
+                return;
+            }
+            studentTbody.replaceChildren();
+
+            if (!items.length) {
+                studentTableWrap.hidden = true;
+                studentToolbar.hidden = true;
+                studentEmpty.hidden = false;
+                if (filterEmptyEl) {
+                    filterEmptyEl.hidden = true;
+                }
+                return;
+            }
+
+            studentTableWrap.hidden = false;
+            studentToolbar.hidden = false;
+            studentEmpty.hidden = true;
+
+            items.forEach((item) => {
+                const tr = document.createElement("tr");
+                tr.setAttribute("data-feedback-row", "");
+                tr.setAttribute("data-status", item.status.toLowerCase().replace(/\s+/g, "-"));
+                tr.setAttribute("data-search", `${item.title} ${item.category}`.toLowerCase());
+
+                const tdId = document.createElement("td");
+                const idBadge = document.createElement("span");
+                idBadge.className = "ticket-id-badge";
+                idBadge.textContent = "#" + String(item.id);
+                tdId.appendChild(idBadge);
+                tr.appendChild(tdId);
+
+                const tdTitle = document.createElement("td");
+                const link = document.createElement("a");
+                link.className = "row-link";
+                link.href = item.view_url;
+                link.textContent = item.title;
+                tdTitle.appendChild(link);
+                tr.appendChild(tdTitle);
+
+                const tdCat = document.createElement("td");
+                const catSpan = document.createElement("span");
+                catSpan.className = "badge-category";
+                catSpan.textContent = item.category;
+                tdCat.appendChild(catSpan);
+                tr.appendChild(tdCat);
+
+                const tdStatus = document.createElement("td");
+                const statusSpan = document.createElement("span");
+                statusSpan.className = buildStudentStatusClass(item.status);
+                statusSpan.textContent = item.status;
+                tdStatus.appendChild(statusSpan);
+                tr.appendChild(tdStatus);
+
+                const tdResp = document.createElement("td");
+                tdResp.textContent = String(item.response_count);
+                tr.appendChild(tdResp);
+
+                const tdUpdated = document.createElement("td");
+                tdUpdated.className = "muted nowrap";
+                tdUpdated.textContent = item.updated_at;
+                tr.appendChild(tdUpdated);
+
+                const tdActions = document.createElement("td");
+                tdActions.className = "actions-cell";
+
+                const viewBtn = document.createElement("a");
+                viewBtn.className = "btn btn-secondary btn-sm";
+                viewBtn.href = item.view_url;
+                viewBtn.textContent = "View";
+                tdActions.appendChild(viewBtn);
+
+                if (item.status === "New") {
+                    const editBtn = document.createElement("a");
+                    editBtn.className = "btn btn-secondary btn-sm";
+                    editBtn.href = item.edit_url;
+                    editBtn.textContent = "Edit";
+                    tdActions.appendChild(editBtn);
+
+                    if (csrfToken) {
+                        const delForm = document.createElement("form");
+                        delForm.method = "post";
+                        delForm.action = item.delete_url;
+                        delForm.className = "inline-form";
+                        delForm.setAttribute(
+                            "data-confirm-message",
+                            `Delete '${item.title}'? This action cannot be undone.`
+                        );
+
+                        const csrfInput = document.createElement("input");
+                        csrfInput.type = "hidden";
+                        csrfInput.name = "csrf_token";
+                        csrfInput.value = csrfToken;
+                        delForm.appendChild(csrfInput);
+
+                        const delBtn = document.createElement("button");
+                        delBtn.type = "submit";
+                        delBtn.className = "btn btn-danger btn-sm";
+                        delBtn.textContent = "Delete";
+                        delForm.appendChild(delBtn);
+
+                        tdActions.appendChild(delForm);
+                    }
+                } else {
+                    const lockedSpan = document.createElement("span");
+                    lockedSpan.className = "locked-tag";
+                    lockedSpan.textContent = "Locked";
+                    tdActions.appendChild(lockedSpan);
+                }
+
+                tr.appendChild(tdActions);
+                studentTbody.appendChild(tr);
+            });
+
+            applyStudentFilters();
+        };
+
+        const syncStudentFeedback = async () => {
+            if (!studentPollUrl) {
+                return;
+            }
+            try {
+                const resp = await fetch(studentPollUrl, {
+                    headers: { Accept: "application/json" },
+                    cache: "no-store",
+                });
+                if (!resp.ok) {
+                    return;
+                }
+                const data = await resp.json();
+                const counts = data.counts || {};
+                document.querySelectorAll("[data-student-stat]").forEach((el) => {
+                    const key = el.getAttribute("data-student-stat");
+                    if (key && key in counts) {
+                        el.textContent = String(counts[key]);
+                    }
+                });
+
+                const items = Array.isArray(data.submissions) ? data.submissions : [];
+                items.forEach((item) => {
+                    const prev = snapshotMap.get(item.id);
+                    if (prev && (prev.status !== item.status || item.response_count > prev.responses)) {
+                        if (studentLiveAlert && studentLiveText && studentLiveLink) {
+                            studentLiveText.textContent =
+                                `Ticket #${item.id} "${item.title}" updated — Status: ${item.status}, Replies: ${item.response_count}`;
+                            studentLiveLink.href = item.view_url;
+                            studentLiveAlert.hidden = false;
+                        }
+                    }
+                    snapshotMap.set(item.id, {
+                        status: item.status,
+                        responses: item.response_count,
+                    });
+                });
+
+                renderStudentRows(items);
+            } catch (_err) {
+                // Ignore transient network hiccups silently
+            }
+        };
+
+        const quickForm = document.getElementById("quick-request-form");
+        const quickTitle = document.getElementById("quick-title");
+        const quickDesc = document.getElementById("quick-description");
+        const quickBanner = document.getElementById("quick-composer-banner");
+        const quickSubmitBtn = document.getElementById("quick-submit-btn");
+        const errTitle = document.getElementById("quick-error-title");
+        const errCat = document.getElementById("quick-error-category");
+        const errDesc = document.getElementById("quick-error-description");
+
+        const clearQuickErrors = () => {
+            [errTitle, errCat, errDesc].forEach((el) => {
+                if (el) {
+                    el.hidden = true;
+                    el.textContent = "";
+                }
+            });
+            if (quickTitle) quickTitle.classList.remove("input-error");
+            if (quickDesc) quickDesc.classList.remove("input-error");
+        };
+
+        if (quickForm && quickTitle && quickDesc) {
+            quickForm.addEventListener("submit", async (event) => {
+                event.preventDefault();
+                clearQuickErrors();
+                if (quickBanner) {
+                    quickBanner.hidden = true;
+                }
+                if (quickSubmitBtn) {
+                    quickSubmitBtn.disabled = true;
+                    quickSubmitBtn.textContent = "Submitting...";
+                }
+
+                try {
+                    const formData = new FormData(quickForm);
+                    const resp = await fetch(quickForm.action, {
+                        method: "POST",
+                        headers: {
+                            "X-Requested-With": "fetch",
+                            Accept: "application/json",
+                        },
+                        body: formData,
+                    });
+                    const payload = await resp.json();
+
+                    if (!resp.ok || !payload.ok) {
+                        const errors = (payload && payload.errors) || {};
+                        if (errors.title && errTitle) {
+                            errTitle.textContent = errors.title;
+                            errTitle.hidden = false;
+                            quickTitle.classList.add("input-error");
+                        }
+                        if (errors.category && errCat) {
+                            errCat.textContent = errors.category;
+                            errCat.hidden = false;
+                        }
+                        if (errors.description && errDesc) {
+                            errDesc.textContent = errors.description;
+                            errDesc.hidden = false;
+                            quickDesc.classList.add("input-error");
+                        }
+                    } else {
+                        quickTitle.value = "";
+                        quickDesc.value = "";
+                        quickDesc.dispatchEvent(new Event("input"));
+                        if (quickBanner && payload.ticket) {
+                            quickBanner.textContent =
+                                `Ticket #${payload.ticket.id} ("${payload.ticket.title}") raised with status New and sent to the Class Rep Admin queue.`;
+                            quickBanner.hidden = false;
+                        }
+                        await syncStudentFeedback();
+                    }
+                } catch (_err) {
+                    quickForm.submit();
+                } finally {
+                    if (quickSubmitBtn) {
+                        quickSubmitBtn.disabled = false;
+                        quickSubmitBtn.textContent = "Submit Request";
+                    }
+                }
+            });
+        }
+
+        window.setInterval(syncStudentFeedback, 2500);
+        window.addEventListener("focus", syncStudentFeedback);
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) {
+                syncStudentFeedback();
+            }
+        });
     }
 });

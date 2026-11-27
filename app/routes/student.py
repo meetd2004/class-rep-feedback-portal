@@ -1,8 +1,22 @@
-"""Student workflow routes: dashboard, feedback CRUD, and shared detail view."""
+"""Student workflow routes: dashboard, quick request submission, live sync API, and feedback CRUD."""
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
+import sqlite3
+from typing import Any
+
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 
 from app.db import get_db, utc_now_iso
 from app.routes import render_feedback_detail
@@ -16,12 +30,10 @@ from app.security import (
 student_bp = Blueprint("student", __name__)
 
 
-@student_bp.route("/student/dashboard")
-@role_required("student")
-def dashboard() -> str:
-    """Display only the signed-in student's own feedback submissions."""
+def _fetch_student_submissions(student_id: int, cohort: str) -> list[sqlite3.Row]:
+    """Return submissions authored by the given student within their cohort."""
     db = get_db()
-    submissions = db.execute(
+    return db.execute(
         """
         SELECT
             f.id,
@@ -33,23 +45,61 @@ def dashboard() -> str:
             (SELECT COUNT(*) FROM responses AS r WHERE r.feedback_id = f.id) AS response_count
         FROM feedback AS f
         WHERE f.author_id = ? AND f.cohort = ?
-        ORDER BY f.updated_at DESC, f.id DESC;
+        ORDER BY f.id DESC;
         """,
-        (g.user["id"], g.user["cohort"]),
+        (student_id, cohort),
     ).fetchall()
 
-    counts = {
+
+def _compute_student_counts(submissions: list[sqlite3.Row]) -> dict[str, int]:
+    """Summarize submission counts by status for the student dashboard."""
+    return {
         "total": len(submissions),
         "New": sum(1 for row in submissions if row["status"] == "New"),
         "In Review": sum(1 for row in submissions if row["status"] == "In Review"),
         "Resolved": sum(1 for row in submissions if row["status"] == "Resolved"),
     }
 
+
+@student_bp.route("/student/dashboard")
+@role_required("student")
+def dashboard() -> str:
+    """Display only the signed-in student's own feedback submissions and quick request UI."""
+    submissions = _fetch_student_submissions(g.user["id"], g.user["cohort"])
+    counts = _compute_student_counts(submissions)
+    categories = current_app.config["ALLOWED_CATEGORIES"]
+
     return render_template(
         "student_dashboard.html",
         submissions=submissions,
         counts=counts,
+        categories=categories,
     )
+
+
+@student_bp.route("/student/api/my-feedback")
+@role_required("student")
+def my_feedback_api() -> object:
+    """Return live status, reply counts, and submissions scoped to the signed-in student."""
+    submissions = _fetch_student_submissions(g.user["id"], g.user["cohort"])
+    counts = _compute_student_counts(submissions)
+
+    items = [
+        {
+            "id": int(row["id"]),
+            "title": row["title"],
+            "category": row["category"],
+            "status": row["status"],
+            "response_count": int(row["response_count"]),
+            "updated_at": row["updated_at"],
+            "view_url": url_for("student.view_feedback", feedback_id=row["id"]),
+            "edit_url": url_for("student.edit_feedback", feedback_id=row["id"]),
+            "delete_url": url_for("student.delete_feedback", feedback_id=row["id"]),
+        }
+        for row in submissions
+    ]
+
+    return jsonify({"counts": counts, "submissions": items})
 
 
 @student_bp.route("/feedback/new", methods=["GET", "POST"])
@@ -59,6 +109,7 @@ def create_feedback() -> object:
     categories = current_app.config["ALLOWED_CATEGORIES"]
     form_data = {"title": "", "category": "", "description": ""}
     errors: dict[str, str] = {}
+    is_fetch = request.headers.get("X-Requested-With") == "fetch"
 
     if request.method == "POST":
         form_data, errors = validate_feedback_input(
@@ -88,8 +139,30 @@ def create_feedback() -> object:
                 ),
             )
             db.commit()
+            new_id = int(cursor.lastrowid)
+
+            if is_fetch:
+                return (
+                    jsonify(
+                        {
+                            "ok": True,
+                            "ticket": {
+                                "id": new_id,
+                                "title": form_data["title"],
+                                "category": form_data["category"],
+                                "status": "New",
+                                "view_url": url_for("student.view_feedback", feedback_id=new_id),
+                            },
+                        }
+                    ),
+                    201,
+                )
+
             flash("Your feedback has been submitted with status New.", "success")
-            return redirect(url_for("student.view_feedback", feedback_id=cursor.lastrowid))
+            return redirect(url_for("student.view_feedback", feedback_id=new_id))
+
+        if is_fetch:
+            return jsonify({"ok": False, "errors": errors}), 400
 
     return render_template(
         "feedback_form.html",

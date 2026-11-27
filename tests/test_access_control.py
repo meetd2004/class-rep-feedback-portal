@@ -80,6 +80,7 @@ def test_student_cannot_access_rep_routes(client) -> None:
 def test_rep_cannot_access_student_submission_routes(client) -> None:
     login_as(client, "niamh.gallagher@nci-demo.example", "RepDemo!2026")
     assert client.get("/student/dashboard").status_code == 403
+    assert client.get("/student/api/my-feedback").status_code == 403
     assert client.get("/feedback/new").status_code == 403
 
     token = extract_csrf_token(client.get("/rep/dashboard").get_data(as_text=True))
