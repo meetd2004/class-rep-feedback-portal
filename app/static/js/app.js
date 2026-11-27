@@ -1145,10 +1145,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         window.setInterval(syncDetailLive, 2500);
         window.addEventListener("focus", syncDetailLive);
+        window.addEventListener("pageshow", syncDetailLive);
         document.addEventListener("visibilitychange", () => {
             if (!document.hidden) {
                 syncDetailLive();
             }
         });
+        syncDetailLive();
     }
 });

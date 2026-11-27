@@ -106,6 +106,49 @@ def test_rep_response_and_status_progression_visible_to_author(app, client) -> N
     assert "Reported the audio echo" in matched["latest_reply"]["message"]
 
 
+def test_rep_can_select_resolved_status_directly_when_posting_reply(app, client) -> None:
+    conn = connect_sqlite(app.config["DATABASE_PATH"])
+    try:
+        target = conn.execute(
+            """
+            SELECT f.id
+            FROM feedback AS f
+            JOIN users AS u ON u.id = f.author_id
+            WHERE u.email = 'aoife.brennan@nci-demo.example' AND f.status = 'In Review'
+            LIMIT 1;
+            """
+        ).fetchone()
+    finally:
+        conn.close()
+    assert target is not None
+    fid = target["id"]
+
+    login_as(client, "niamh.gallagher@nci-demo.example", "RepDemo!2026")
+    token = extract_csrf_token(client.get(f"/rep/feedback/{fid}").get_data(as_text=True))
+
+    res = client.post(
+        f"/rep/feedback/{fid}/respond",
+        data={
+            "csrf_token": token,
+            "target_status": "Resolved",
+            "message": "Confirmed IEEE citation formatting and updated Moodle FAQ.",
+        },
+        follow_redirects=True,
+    )
+    assert res.status_code == 200
+    assert "status updated to Resolved" in res.get_data(as_text=True)
+
+    logout_tok = extract_csrf_token(res.get_data(as_text=True))
+    client.post("/logout", data={"csrf_token": logout_tok})
+
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    student_detail = client.get(f"/feedback/{fid}").get_data(as_text=True)
+    assert "Resolved" in student_detail
+    assert "Confirmed IEEE citation formatting and updated Moodle FAQ." in student_detail
+    live = client.get(f"/feedback/{fid}/live").get_json()
+    assert live["status"] == "Resolved"
+
+
 def test_xss_payloads_are_html_escaped(app, client) -> None:
     xss_title = "<script>alert('xss-title')</script>"
     xss_desc = "Details with <img src=x onerror=alert('xss-body')> payload inside."

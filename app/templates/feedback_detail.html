@@ -111,6 +111,21 @@
 
             <form action="{{ url_for('rep.add_response', feedback_id=feedback.id) }}" method="post" class="stack-form admin-form-top" novalidate>
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if allowed_next_statuses %}
+                    <div class="form-group">
+                        <label for="target_status">Status After Reply</label>
+                        <select id="target_status" name="target_status">
+                            {% if feedback.status != 'New' %}
+                                <option value="{{ feedback.status }}" selected>Keep {{ feedback.status }}</option>
+                            {% endif %}
+                            {% for next_status in allowed_next_statuses %}
+                                <option value="{{ next_status }}" {{ 'selected' if feedback.status == 'New' and next_status == 'In Review' else '' }}>
+                                    {{ next_status }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
                 <div class="form-group">
                     <label for="message">Response <span class="required">*</span></label>
                     <textarea

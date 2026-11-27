@@ -219,13 +219,27 @@ def view_feedback(feedback_id: int) -> str:
 @rep_bp.route("/feedback/<int:feedback_id>/respond", methods=["POST"])
 @role_required("rep")
 def add_response(feedback_id: int) -> object:
-    """Post an official class rep response and advance New items to In Review."""
+    """Post an official class rep response and optionally advance submission status."""
     feedback = get_authorized_feedback(feedback_id, g.user, require_rep_cohort=True)
     cleaned_message, error = validate_response_input(request.form.get("message", ""))
 
     if error is not None:
         flash(error, "danger")
         return redirect(url_for("rep.view_feedback", feedback_id=feedback_id))
+
+    requested_status = request.form.get("target_status", "").strip()
+    if requested_status:
+        if requested_status == feedback["status"] and feedback["status"] != "New":
+            new_status = feedback["status"]
+        else:
+            status_error = validate_status_transition(feedback["status"], requested_status)
+            if status_error is not None:
+                flash(status_error, "danger")
+                return redirect(url_for("rep.view_feedback", feedback_id=feedback_id))
+            new_status = requested_status
+    else:
+        # Automatically move 'New' -> 'In Review' once a rep responds so the item is locked from student edits/deletion.
+        new_status = "In Review" if feedback["status"] == "New" else feedback["status"]
 
     now = utc_now_iso()
     db = get_db()
@@ -237,8 +251,6 @@ def add_response(feedback_id: int) -> object:
         (feedback_id, g.user["id"], cleaned_message, now),
     )
 
-    # Automatically move 'New' -> 'In Review' once a rep responds so the item is locked from student edits/deletion.
-    new_status = "In Review" if feedback["status"] == "New" else feedback["status"]
     cursor = db.execute(
         "UPDATE feedback SET status = ?, updated_at = ? WHERE id = ? AND cohort = ?;",
         (new_status, now, feedback_id, g.user["cohort"]),
@@ -248,9 +260,9 @@ def add_response(feedback_id: int) -> object:
         abort(403)
     db.commit()
 
-    if feedback["status"] == "New":
+    if new_status != feedback["status"]:
         flash(
-            f"Response posted to {feedback['author_name']} and status moved to In Review.",
+            f"Response posted to {feedback['author_name']} and status updated to {new_status}.",
             "success",
         )
     else:
