@@ -727,12 +727,16 @@ document.addEventListener("DOMContentLoaded", () => {
             studentEmpty.hidden = true;
 
             items.forEach((item) => {
+                const replyText = item.latest_reply ? item.latest_reply.message : "";
                 const tr = document.createElement("tr");
                 tr.setAttribute("data-feedback-row", "");
                 tr.setAttribute("data-id", String(item.id));
                 tr.setAttribute("data-category", item.category);
                 tr.setAttribute("data-status", item.status.toLowerCase().replace(/\s+/g, "-"));
-                tr.setAttribute("data-search", `${item.title} ${item.category} #${item.id}`.toLowerCase());
+                tr.setAttribute(
+                    "data-search",
+                    `${item.title} ${item.category} #${item.id} ${replyText}`.toLowerCase()
+                );
 
                 const tdId = document.createElement("td");
                 const idBadge = document.createElement("span");
@@ -747,6 +751,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 link.href = item.view_url;
                 link.textContent = item.title;
                 tdTitle.appendChild(link);
+                if (item.latest_reply && item.latest_reply.message) {
+                    const replyDiv = document.createElement("div");
+                    replyDiv.className = "inline-reply-preview";
+
+                    const repNameEl = document.createElement("strong");
+                    repNameEl.textContent = `${item.latest_reply.rep_name}: `;
+                    replyDiv.appendChild(repNameEl);
+
+                    const repMsgEl = document.createElement("span");
+                    const truncated =
+                        item.latest_reply.message.length > 120
+                            ? `${item.latest_reply.message.slice(0, 120)}…`
+                            : item.latest_reply.message;
+                    repMsgEl.textContent = truncated;
+                    replyDiv.appendChild(repMsgEl);
+
+                    tdTitle.appendChild(replyDiv);
+                }
                 tr.appendChild(tdTitle);
 
                 const tdCat = document.createElement("td");
@@ -959,11 +981,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         window.setInterval(syncStudentFeedback, 2500);
         window.addEventListener("focus", syncStudentFeedback);
+        window.addEventListener("pageshow", syncStudentFeedback);
         document.addEventListener("visibilitychange", () => {
             if (!document.hidden) {
                 syncStudentFeedback();
             }
         });
+        syncStudentFeedback();
     }
 
     // 11. Student Ticket Detail Real-Time Reply & Status Sync

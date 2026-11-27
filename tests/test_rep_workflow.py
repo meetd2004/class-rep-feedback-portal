@@ -84,6 +84,10 @@ def test_rep_response_and_status_progression_visible_to_author(app, client) -> N
     client.post("/logout", data={"csrf_token": logout_token})
 
     login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    student_dash = client.get("/student/dashboard").get_data(as_text=True)
+    assert "Niamh Gallagher:" in student_dash
+    assert "Reported the audio echo to IT Services for re-encoding." in student_dash
+
     student_detail = client.get(f"/feedback/{fid}").get_data(as_text=True)
     assert "Reported the audio echo to IT Services for re-encoding." in student_detail
     assert "Resolved" in student_detail

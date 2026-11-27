@@ -52,12 +52,41 @@ def _fetch_student_submissions(
             f.status,
             f.created_at,
             f.updated_at,
-            (SELECT COUNT(*) FROM responses AS r WHERE r.feedback_id = f.id) AS response_count
+            (SELECT COUNT(*) FROM responses AS r WHERE r.feedback_id = f.id) AS response_count,
+            (
+                SELECT r.message
+                FROM responses AS r
+                WHERE r.feedback_id = f.id
+                ORDER BY r.id DESC
+                LIMIT 1
+            ) AS latest_reply_message,
+            (
+                SELECT u.full_name
+                FROM responses AS r
+                JOIN users AS u ON u.id = r.rep_id
+                WHERE r.feedback_id = f.id
+                ORDER BY r.id DESC
+                LIMIT 1
+            ) AS latest_reply_by,
+            (
+                SELECT r.created_at
+                FROM responses AS r
+                WHERE r.feedback_id = f.id
+                ORDER BY r.id DESC
+                LIMIT 1
+            ) AS latest_reply_at
         FROM feedback AS f
         WHERE f.author_id = ? AND f.cohort = ?
           AND (? = '' OR f.category = ?)
           AND (? = '' OR f.status = ?)
-          AND (? = '' OR lower(f.title) LIKE ? ESCAPE '\\' OR lower(f.category) LIKE ? ESCAPE '\\')
+          AND (
+              ? = ''
+              OR lower(f.title) LIKE ? ESCAPE '\\'
+              OR lower(f.category) LIKE ? ESCAPE '\\'
+              OR lower(COALESCE((
+                  SELECT r.message FROM responses AS r WHERE r.feedback_id = f.id ORDER BY r.id DESC LIMIT 1
+              ), '')) LIKE ? ESCAPE '\\'
+          )
         ORDER BY
             CASE WHEN ? = 'status' THEN
                 CASE f.status WHEN 'New' THEN 1 WHEN 'In Review' THEN 2 ELSE 3 END
@@ -73,6 +102,7 @@ def _fetch_student_submissions(
             selected_status,
             selected_status,
             search_query,
+            like_pattern,
             like_pattern,
             like_pattern,
             sort_by,
@@ -156,41 +186,28 @@ def my_feedback_api() -> object:
         sort_by,
     )
 
-    items = []
-    db = get_db()
-    for row in submissions:
-        latest_resp = db.execute(
-            """
-            SELECT r.message, r.created_at, u.full_name AS rep_name
-            FROM responses AS r
-            JOIN users AS u ON u.id = r.rep_id
-            WHERE r.feedback_id = ?
-            ORDER BY r.id DESC
-            LIMIT 1;
-            """,
-            (row["id"],),
-        ).fetchone()
-        items.append(
-            {
-                "id": int(row["id"]),
-                "title": row["title"],
-                "category": row["category"],
-                "status": row["status"],
-                "response_count": int(row["response_count"]),
-                "created_at": row["created_at"],
-                "updated_at": row["updated_at"],
-                "latest_reply": {
-                    "rep_name": latest_resp["rep_name"],
-                    "message": latest_resp["message"][:120],
-                    "created_at": latest_resp["created_at"],
-                }
-                if latest_resp
-                else None,
-                "view_url": url_for("student.view_feedback", feedback_id=row["id"]),
-                "edit_url": url_for("student.edit_feedback", feedback_id=row["id"]),
-                "delete_url": url_for("student.delete_feedback", feedback_id=row["id"]),
+    items = [
+        {
+            "id": int(row["id"]),
+            "title": row["title"],
+            "category": row["category"],
+            "status": row["status"],
+            "response_count": int(row["response_count"]),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "latest_reply": {
+                "rep_name": row["latest_reply_by"],
+                "message": row["latest_reply_message"][:140],
+                "created_at": row["latest_reply_at"],
             }
-        )
+            if row["latest_reply_message"]
+            else None,
+            "view_url": url_for("student.view_feedback", feedback_id=row["id"]),
+            "edit_url": url_for("student.edit_feedback", feedback_id=row["id"]),
+            "delete_url": url_for("student.delete_feedback", feedback_id=row["id"]),
+        }
+        for row in submissions
+    ]
 
     return jsonify({"counts": counts, "submissions": items})
 

@@ -211,13 +211,19 @@
                         data-id="{{ item.id }}"
                         data-category="{{ item.category }}"
                         data-status="{{ item.status|lower|replace(' ', '-') }}"
-                        data-search="{{ (item.title ~ ' ' ~ item.category ~ ' #' ~ item.id)|lower }}"
+                        data-search="{{ (item.title ~ ' ' ~ item.category ~ ' #' ~ item.id ~ ' ' ~ (item.latest_reply_message or ''))|lower }}"
                     >
                         <td><span class="ticket-id-badge">#{{ item.id }}</span></td>
                         <td>
                             <a href="{{ url_for('student.view_feedback', feedback_id=item.id) }}" class="row-link">
                                 {{ item.title }}
                             </a>
+                            {% if item.latest_reply_message %}
+                                <div class="inline-reply-preview">
+                                    <strong>{{ item.latest_reply_by }}:</strong>
+                                    <span>{{ item.latest_reply_message[:120] }}{% if item.latest_reply_message|length > 120 %}&hellip;{% endif %}</span>
+                                </div>
+                            {% endif %}
                         </td>
                         <td><span class="badge-category">{{ item.category }}</span></td>
                         <td>

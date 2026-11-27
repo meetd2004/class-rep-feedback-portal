@@ -249,9 +249,12 @@ def add_response(feedback_id: int) -> object:
     db.commit()
 
     if feedback["status"] == "New":
-        flash("Response posted and submission status moved to In Review.", "success")
+        flash(
+            f"Response posted to {feedback['author_name']} and status moved to In Review.",
+            "success",
+        )
     else:
-        flash("Response posted.", "success")
+        flash(f"Response posted to {feedback['author_name']}.", "success")
 
     return redirect(url_for("rep.view_feedback", feedback_id=feedback_id))
 

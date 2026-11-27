@@ -1140,6 +1140,21 @@ textarea:focus {
     color: var(--primary);
 }
 
+.inline-reply-preview {
+    margin-top: 0.35rem;
+    padding: 0.35rem 0.6rem;
+    background: #eff6ff;
+    border-left: 3px solid var(--primary);
+    border-radius: 0 6px 6px 0;
+    font-size: 0.82rem;
+    color: #334155;
+    line-height: 1.4;
+}
+
+.inline-reply-preview strong {
+    color: #1e40af;
+}
+
 .actions-col,
 .actions-cell {
     white-space: nowrap;
