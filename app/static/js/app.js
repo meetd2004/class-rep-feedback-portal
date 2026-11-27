@@ -404,6 +404,73 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    // 7.5 Client-side Login Form Validation (mirrors server-side validate_login_input)
+    const loginForm = document.getElementById("login-form");
+    const loginEmail = document.getElementById("email");
+    const loginPassword = document.getElementById("password");
+    const loginEmailErr = document.getElementById("login-email-error");
+    const loginPasswordErr = document.getElementById("login-password-error");
+    const emailRegex = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
+
+    if (loginForm && loginEmail && loginPassword && loginEmailErr && loginPasswordErr) {
+        const validateLoginFields = () => {
+            let valid = true;
+            const emailVal = loginEmail.value.trim();
+            const pwVal = loginPassword.value;
+
+            loginEmailErr.hidden = true;
+            loginEmailErr.textContent = "";
+            loginEmail.classList.remove("input-error");
+            loginEmail.setAttribute("aria-invalid", "false");
+
+            loginPasswordErr.hidden = true;
+            loginPasswordErr.textContent = "";
+            loginPassword.classList.remove("input-error");
+            loginPassword.setAttribute("aria-invalid", "false");
+
+            if (!emailVal) {
+                loginEmailErr.textContent = "Email address is required.";
+                loginEmailErr.hidden = false;
+                loginEmail.classList.add("input-error");
+                loginEmail.setAttribute("aria-invalid", "true");
+                valid = false;
+            } else if (emailVal.length > 254 || !emailRegex.test(emailVal)) {
+                loginEmailErr.textContent = "Enter a valid email address (for example, name@example.com).";
+                loginEmailErr.hidden = false;
+                loginEmail.classList.add("input-error");
+                loginEmail.setAttribute("aria-invalid", "true");
+                valid = false;
+            }
+
+            if (!pwVal) {
+                loginPasswordErr.textContent = "Credential entry is required.";
+                loginPasswordErr.hidden = false;
+                loginPassword.classList.add("input-error");
+                loginPassword.setAttribute("aria-invalid", "true");
+                valid = false;
+            } else if (pwVal.length < 8 || pwVal.length > 128) {
+                loginPasswordErr.textContent = "Entered credential must be between 8 and 128 characters.";
+                loginPasswordErr.hidden = false;
+                loginPassword.classList.add("input-error");
+                loginPassword.setAttribute("aria-invalid", "true");
+                valid = false;
+            }
+
+            return valid;
+        };
+
+        loginForm.addEventListener("submit", (event) => {
+            if (!validateLoginFields()) {
+                event.preventDefault();
+            }
+        });
+        loginEmail.addEventListener("blur", () => {
+            if (loginEmail.value.trim()) {
+                validateLoginFields();
+            }
+        });
+    }
+
     // 8. Textarea live character counter
     document.querySelectorAll("textarea[data-char-count]").forEach((textarea) => {
         const counterId = textarea.getAttribute("data-char-count");

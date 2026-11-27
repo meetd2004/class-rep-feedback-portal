@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import secrets
 import sqlite3
 import time
@@ -14,6 +15,7 @@ from flask import abort, current_app, flash, g, redirect, session, url_for
 
 from app.db import get_db
 
+EMAIL_PATTERN = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$")
 SESSION_IDLE_TIMEOUT_SECONDS = 1800  # 30-minute idle timeout
 LOGIN_WINDOW_SECONDS = 300  # 5-minute sliding rate-limit window
 MAX_FAILED_LOGINS = 5
@@ -234,6 +236,25 @@ def get_authorized_feedback(
 def _normalize_text(value: str) -> str:
     """Strip NUL bytes, normalise CRLF newlines, and trim outer whitespace."""
     return value.replace("\x00", "").replace("\r\n", "\n").strip()
+
+
+def validate_login_input(email: str, password: str) -> tuple[str, dict[str, str]]:
+    """Validate and normalise login inputs before querying the database or hashing."""
+    cleaned_email = email.replace("\x00", "").strip().lower()
+    cleaned_secret = password.replace("\x00", "")
+    errors: dict[str, str] = {}
+
+    if not cleaned_email:
+        errors["email"] = "Email address is required."
+    elif len(cleaned_email) > 254 or not EMAIL_PATTERN.match(cleaned_email):
+        errors["email"] = "Enter a valid email address (for example, name@example.com)."
+
+    if not cleaned_secret:
+        errors["cred"] = "Credential entry is required."
+    elif len(cleaned_secret) < 8 or len(cleaned_secret) > 128:
+        errors["cred"] = "Entered credential must be between 8 and 128 characters."
+
+    return cleaned_email, errors
 
 
 def validate_feedback_input(

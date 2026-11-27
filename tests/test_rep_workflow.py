@@ -173,7 +173,7 @@ def test_xss_payloads_are_html_escaped(app, client) -> None:
 
 def test_sql_injection_payloads_cannot_bypass_auth_or_filters(client) -> None:
     token = extract_csrf_token(client.get("/login").get_data(as_text=True))
-    sqli_login = client.post(
+    malformed_sqli = client.post(
         "/login",
         data={
             "csrf_token": token,
@@ -181,8 +181,19 @@ def test_sql_injection_payloads_cannot_bypass_auth_or_filters(client) -> None:
             "password": "' OR '1'='1",
         },
     )
-    assert sqli_login.status_code == 200
-    assert "Invalid email or password." in sqli_login.get_data(as_text=True)
+    assert malformed_sqli.status_code == 400
+    assert "Enter a valid email address" in malformed_sqli.get_data(as_text=True)
+
+    email_shaped_sqli = client.post(
+        "/login",
+        data={
+            "csrf_token": token,
+            "email": "'or'1'='1@nci-demo.example",
+            "password": "AnyLongPassword123",
+        },
+    )
+    assert email_shaped_sqli.status_code == 200
+    assert "Invalid email or password." in email_shaped_sqli.get_data(as_text=True)
 
     login_as(client, "niamh.gallagher@nci-demo.example", "RepDemo!2026")
     sqli_filter = client.get("/rep/dashboard?category=' OR 1=1 --&status=New")

@@ -201,3 +201,32 @@ def test_account_profile_and_password_change_flow(client) -> None:
     relogin = login_as(client, "aoife.brennan@nci-demo.example", "UpdatedDemoPass!2026")
     assert relogin.status_code == 302
     assert relogin.headers["Location"].endswith("/student/dashboard")
+
+
+def test_login_data_validation_rejects_malformed_email_and_out_of_bounds_password(client) -> None:
+    token = extract_csrf_token(client.get("/login").get_data(as_text=True))
+
+    bad_email = client.post(
+        "/login",
+        data={"csrf_token": token, "email": "not-an-email", "password": "ValidLengthPassword"},
+    )
+    assert bad_email.status_code == 400
+    assert "Enter a valid email address" in bad_email.get_data(as_text=True)
+
+    too_short_pw = client.post(
+        "/login",
+        data={"csrf_token": token, "email": "aoife.brennan@nci-demo.example", "password": "short"},
+    )
+    assert too_short_pw.status_code == 400
+    assert "must be between 8 and 128 characters" in too_short_pw.get_data(as_text=True)
+
+    oversized_pw = client.post(
+        "/login",
+        data={
+            "csrf_token": token,
+            "email": "aoife.brennan@nci-demo.example",
+            "password": "X" * 500,
+        },
+    )
+    assert oversized_pw.status_code == 400
+    assert "must be between 8 and 128 characters" in oversized_pw.get_data(as_text=True)

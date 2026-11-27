@@ -13,6 +13,7 @@ from app.security import (
     is_login_rate_limited,
     login_required,
     record_failed_login,
+    validate_login_input,
     verify_password,
 )
 
@@ -42,20 +43,24 @@ def login() -> object:
 
     email_value = ""
     error_message = None
+    field_errors: dict[str, str] = {}
     status_code = 200
 
     if request.method == "POST":
-        email_value = request.form.get("email", "").strip()
-        password = request.form.get("password", "")
+        raw_email = request.form.get("email", "")
+        raw_password = request.form.get("password", "")
+        email_value, field_errors = validate_login_input(raw_email, raw_password)
         remote_addr = request.remote_addr or "unknown"
 
-        if is_login_rate_limited(email_value, remote_addr):
+        if is_login_rate_limited(email_value or raw_email, remote_addr):
             error_message = "Too many failed sign-in attempts. Please wait a few minutes and try again."
+            field_errors = {}
             status_code = 429
-        elif not email_value or not password:
-            error_message = "Please enter both your email address and password."
+        elif field_errors:
+            error_message = "Please fix the validation errors below before signing in."
+            status_code = 400
         else:
-            user = authenticate_user(email_value, password)
+            user = authenticate_user(email_value, raw_password)
             if user is None:
                 record_failed_login(email_value, remote_addr)
                 # Generic error avoids confirming whether an email exists.
@@ -71,6 +76,7 @@ def login() -> object:
             "login.html",
             email_value=email_value,
             error_message=error_message,
+            field_errors=field_errors,
             cohort=current_app.config["PORTAL_COHORT"],
         ),
         status_code,
