@@ -22,6 +22,7 @@
     <form
         action="{{ url_for('student.edit_feedback', feedback_id=feedback.id) if mode == 'edit' else url_for('student.create_feedback') }}"
         method="post"
+        enctype="multipart/form-data"
         class="stack-form"
         novalidate
     >
@@ -85,6 +86,38 @@
             </div>
             {% if errors.get('description') %}
                 <p id="description-error" class="field-error" role="alert">{{ errors['description'] }}</p>
+            {% endif %}
+        </div>
+
+        {% if mode == 'edit' and existing_attachments %}
+        <div class="form-group">
+            <span class="form-label-text">Current Attachments (check to remove)</span>
+            <div class="existing-attachments-list">
+                {% for att in existing_attachments %}
+                    <label class="existing-attachment-item">
+                        <input type="checkbox" name="remove_attachment_ids" value="{{ att.id }}">
+                        <span>{{ att.original_filename }} ({{ (att.file_size / 1024)|round(1) }} KB)</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="attachments">{{ 'Add More Pictures or Files (Optional)' if mode == 'edit' else 'Attach Pictures or Files (Optional)' }}</label>
+            <input
+                id="attachments"
+                name="attachments"
+                type="file"
+                multiple
+                accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt"
+                class="{{ 'input-error' if errors.get('attachments') else '' }}"
+                aria-invalid="{{ 'true' if errors.get('attachments') else 'false' }}"
+                {% if errors.get('attachments') %}aria-describedby="attachments-error"{% endif %}
+            >
+            <span class="muted">Up to 3 files total (PNG, JPG, GIF, WEBP, PDF, TXT · max 5 MB total).</span>
+            {% if errors.get('attachments') %}
+                <p id="attachments-error" class="field-error" role="alert">{{ errors['attachments'] }}</p>
             {% endif %}
         </div>
 

@@ -91,7 +91,8 @@ def _fetch_queue_submissions(
             f.created_at,
             f.updated_at,
             u.full_name AS author_name,
-            (SELECT COUNT(*) FROM responses AS r WHERE r.feedback_id = f.id) AS response_count
+            (SELECT COUNT(*) FROM responses AS r WHERE r.feedback_id = f.id) AS response_count,
+            (SELECT COUNT(*) FROM attachments AS a WHERE a.feedback_id = f.id) AS attachment_count
         FROM feedback AS f
         JOIN users AS u ON u.id = f.author_id
         WHERE f.cohort = ?
@@ -184,6 +185,7 @@ def queue_summary_api() -> object:
             "category": row["category"],
             "status": row["status"],
             "response_count": int(row["response_count"]),
+            "attachment_count": int(row["attachment_count"]),
             "updated_at": row["updated_at"],
             "detail_url": url_for("rep.view_feedback", feedback_id=row["id"]),
             "status_url": url_for("rep.update_status", feedback_id=row["id"]),

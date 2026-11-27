@@ -1155,6 +1155,143 @@ textarea:focus {
     color: #1e40af;
 }
 
+.attachment-pill {
+    display: inline-block;
+    margin-left: 0.45rem;
+    padding: 0.14rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+input[type="file"] {
+    padding: 0.5rem 0.75rem;
+    border: 1px dashed #94a3b8;
+    border-radius: 8px;
+    background: var(--surface-subtle);
+    font: inherit;
+    font-size: 0.88rem;
+}
+
+.existing-attachments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.existing-attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-subtle);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-weight: 500;
+    font-size: 0.88rem;
+    cursor: pointer;
+}
+
+.detail-attachments {
+    margin-top: 1.35rem;
+    padding-top: 1.15rem;
+    border-top: 1px solid var(--border);
+}
+
+.detail-attachments h3 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.96rem;
+    font-weight: 600;
+}
+
+.attachment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 0.85rem;
+}
+
+.attachment-image-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    overflow: hidden;
+    background: var(--surface-subtle);
+    color: var(--text);
+    transition: border-color 0.15s ease, transform 0.12s ease;
+}
+
+.attachment-image-card:hover {
+    text-decoration: none;
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.attachment-image-card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    display: block;
+    background: #e2e8f0;
+}
+
+.attachment-caption {
+    padding: 0.45rem 0.65rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.attachment-doc-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface-subtle);
+    color: var(--text);
+    transition: border-color 0.15s ease;
+}
+
+.attachment-doc-card:hover {
+    text-decoration: none;
+    border-color: var(--primary);
+}
+
+.attachment-doc-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 42px;
+    height: 36px;
+    padding: 0 0.45rem;
+    border-radius: 7px;
+    background: #eef2ff;
+    color: #4f46e5;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.attachment-doc-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.attachment-doc-meta strong {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .actions-col,
 .actions-cell {
     white-space: nowrap;

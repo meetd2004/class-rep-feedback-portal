@@ -80,3 +80,33 @@ class ResponseModel:
             message=str(row["message"]),
             created_at=str(row["created_at"]),
         )
+
+
+@dataclass(frozen=True)
+class AttachmentModel:
+    """Secure file or image attachment stored outside static root and linked to Feedback."""
+
+    id: int
+    feedback_id: int
+    uploader_id: int
+    original_filename: str
+    stored_filename: str
+    content_type: str
+    file_size: int
+    is_image: bool
+    created_at: str
+
+    @classmethod
+    def from_row(cls, row: sqlite3.Row) -> AttachmentModel:
+        """Map a SQLite attachment row into a domain record."""
+        return cls(
+            id=int(row["id"]),
+            feedback_id=int(row["feedback_id"]),
+            uploader_id=int(row["uploader_id"]),
+            original_filename=str(row["original_filename"]),
+            stored_filename=str(row["stored_filename"]),
+            content_type=str(row["content_type"]),
+            file_size=int(row["file_size"]),
+            is_image=bool(row["is_image"]),
+            created_at=str(row["created_at"]),
+        )

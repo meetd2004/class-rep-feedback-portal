@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from typing import Any
 
 from flask import (
@@ -15,6 +16,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     url_for,
 )
 
@@ -23,8 +25,11 @@ from app.routes import render_feedback_detail
 from app.security import (
     get_authorized_feedback,
     login_required,
+    persist_attachments,
+    remove_stored_attachment_files,
     role_required,
     validate_feedback_input,
+    validate_uploaded_attachments,
 )
 
 student_bp = Blueprint("student", __name__)
@@ -53,6 +58,7 @@ def _fetch_student_submissions(
             f.created_at,
             f.updated_at,
             (SELECT COUNT(*) FROM responses AS r WHERE r.feedback_id = f.id) AS response_count,
+            (SELECT COUNT(*) FROM attachments AS a WHERE a.feedback_id = f.id) AS attachment_count,
             (
                 SELECT r.message
                 FROM responses AS r
@@ -193,6 +199,7 @@ def my_feedback_api() -> object:
             "category": row["category"],
             "status": row["status"],
             "response_count": int(row["response_count"]),
+            "attachment_count": int(row["attachment_count"]),
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "latest_reply": {
@@ -228,6 +235,12 @@ def create_feedback() -> object:
             request.form.get("description", ""),
             categories,
         )
+        prepared_files, upload_error = validate_uploaded_attachments(
+            request.files.getlist("attachments")
+        )
+        if upload_error is not None:
+            errors["attachments"] = upload_error
+
         if not errors:
             now = utc_now_iso()
             db = get_db()
@@ -248,8 +261,9 @@ def create_feedback() -> object:
                     now,
                 ),
             )
-            db.commit()
             new_id = int(cursor.lastrowid)
+            persist_attachments(db, new_id, g.user["id"], prepared_files, now)
+            db.commit()
 
             if is_fetch:
                 return (
@@ -330,9 +344,20 @@ def feedback_live_api(feedback_id: int) -> object:
 @student_bp.route("/feedback/<int:feedback_id>/edit", methods=["GET", "POST"])
 @role_required("student")
 def edit_feedback(feedback_id: int) -> object:
-    """Allow a student to edit their own feedback only while its status is 'New'."""
+    """Allow a student to edit their own feedback and attachments while status is 'New'."""
     feedback = get_authorized_feedback(feedback_id, g.user, require_owner_new=True)
     categories = current_app.config["ALLOWED_CATEGORIES"]
+    db = get_db()
+    existing_attachments = db.execute(
+        """
+        SELECT id, original_filename, stored_filename, file_size, is_image
+        FROM attachments
+        WHERE feedback_id = ?
+        ORDER BY id ASC;
+        """,
+        (feedback_id,),
+    ).fetchall()
+
     form_data = {
         "title": feedback["title"],
         "category": feedback["category"],
@@ -347,8 +372,21 @@ def edit_feedback(feedback_id: int) -> object:
             request.form.get("description", ""),
             categories,
         )
+        remove_ids: set[int] = set()
+        for raw_id in request.form.getlist("remove_attachment_ids"):
+            if raw_id.isdigit():
+                remove_ids.add(int(raw_id))
+
+        kept_count = sum(1 for att in existing_attachments if int(att["id"]) not in remove_ids)
+        prepared_files, upload_error = validate_uploaded_attachments(
+            request.files.getlist("attachments"),
+            existing_count=kept_count,
+        )
+        if upload_error is not None:
+            errors["attachments"] = upload_error
+
         if not errors:
-            db = get_db()
+            now = utc_now_iso()
             cursor = db.execute(
                 """
                 UPDATE feedback
@@ -359,7 +397,7 @@ def edit_feedback(feedback_id: int) -> object:
                     form_data["title"],
                     form_data["category"],
                     form_data["description"],
-                    utc_now_iso(),
+                    now,
                     feedback_id,
                     g.user["id"],
                 ),
@@ -367,7 +405,19 @@ def edit_feedback(feedback_id: int) -> object:
             if cursor.rowcount == 0:
                 db.rollback()
                 abort(403)
+
+            removed_files: list[str] = []
+            for att in existing_attachments:
+                if int(att["id"]) in remove_ids:
+                    db.execute(
+                        "DELETE FROM attachments WHERE id = ? AND feedback_id = ?;",
+                        (att["id"], feedback_id),
+                    )
+                    removed_files.append(str(att["stored_filename"]))
+
+            persist_attachments(db, feedback_id, g.user["id"], prepared_files, now)
             db.commit()
+            remove_stored_attachment_files(removed_files)
             flash("Feedback updated successfully.", "success")
             return redirect(url_for("student.view_feedback", feedback_id=feedback_id))
 
@@ -378,6 +428,7 @@ def edit_feedback(feedback_id: int) -> object:
         form_data=form_data,
         errors=errors,
         feedback=feedback,
+        existing_attachments=existing_attachments,
     )
 
 
@@ -387,6 +438,12 @@ def delete_feedback(feedback_id: int) -> object:
     """Allow a student to delete their own feedback only while its status is 'New'."""
     get_authorized_feedback(feedback_id, g.user, require_owner_new=True)
     db = get_db()
+    attachment_rows = db.execute(
+        "SELECT stored_filename FROM attachments WHERE feedback_id = ?;",
+        (feedback_id,),
+    ).fetchall()
+    stored_names = [str(row["stored_filename"]) for row in attachment_rows]
+
     cursor = db.execute(
         "DELETE FROM feedback WHERE id = ? AND author_id = ? AND status = 'New';",
         (feedback_id, g.user["id"]),
@@ -395,5 +452,37 @@ def delete_feedback(feedback_id: int) -> object:
         db.rollback()
         abort(403)
     db.commit()
+    remove_stored_attachment_files(stored_names)
     flash("Feedback submission deleted.", "info")
     return redirect(url_for("student.dashboard"))
+
+
+@student_bp.route("/attachments/<int:attachment_id>")
+@login_required
+def serve_attachment(attachment_id: int) -> object:
+    """Serve an uploaded file or image only to authorized ticket owner or Group B rep."""
+    db = get_db()
+    attachment = db.execute(
+        """
+        SELECT id, feedback_id, original_filename, stored_filename, content_type, is_image
+        FROM attachments
+        WHERE id = ?;
+        """,
+        (attachment_id,),
+    ).fetchone()
+    if attachment is None:
+        abort(404)
+
+    get_authorized_feedback(int(attachment["feedback_id"]), g.user)
+
+    upload_dir = Path(current_app.config["UPLOAD_FOLDER"]).resolve()
+    file_path = (upload_dir / Path(str(attachment["stored_filename"])).name).resolve()
+    if file_path.parent != upload_dir or not file_path.is_file():
+        abort(404)
+
+    return send_file(
+        file_path,
+        mimetype=str(attachment["content_type"]),
+        as_attachment=not bool(attachment["is_image"]),
+        download_name=str(attachment["original_filename"]),
+    )

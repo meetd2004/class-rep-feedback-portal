@@ -108,6 +108,9 @@
                         <a href="{{ url_for('rep.view_feedback', feedback_id=item.id) }}" class="row-link">
                             {{ item.title }}
                         </a>
+                        {% if item.attachment_count %}
+                            <span class="attachment-pill">{{ item.attachment_count }} file{{ 's' if item.attachment_count != 1 else '' }}</span>
+                        {% endif %}
                     </td>
                     <td>{{ item.author_name }}</td>
                     <td><span class="badge-category">{{ item.category }}</span></td>

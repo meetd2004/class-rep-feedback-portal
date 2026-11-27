@@ -17,6 +17,20 @@ class Config:
     DATABASE_PATH: str = os.environ.get(
         "DATABASE_PATH", str(BASE_DIR / "instance" / "feedback_portal.db")
     )
+    UPLOAD_FOLDER: str = os.environ.get(
+        "UPLOAD_FOLDER", str(BASE_DIR / "instance" / "uploads")
+    )
+    MAX_CONTENT_LENGTH: int = 5 * 1024 * 1024  # 5 MB max request upload size
+    MAX_ATTACHMENTS_PER_TICKET: int = 3
+    ALLOWED_ATTACHMENT_EXTENSIONS: tuple[str, ...] = (
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".pdf",
+        ".txt",
+    )
 
     # Session & Cookie Security (SR2)
     SESSION_COOKIE_NAME: str = "crfp_session"

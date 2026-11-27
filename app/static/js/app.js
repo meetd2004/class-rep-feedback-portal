@@ -548,6 +548,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 titleLink.href = ticket.detail_url;
                 titleLink.textContent = ticket.title;
                 tdTitle.appendChild(titleLink);
+                if (ticket.attachment_count > 0) {
+                    const attSpan = document.createElement("span");
+                    attSpan.className = "attachment-pill";
+                    attSpan.textContent = `${ticket.attachment_count} file${ticket.attachment_count === 1 ? "" : "s"}`;
+                    tdTitle.appendChild(attSpan);
+                }
                 tr.appendChild(tdTitle);
 
                 const tdAuthor = document.createElement("td");
@@ -818,6 +824,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 link.href = item.view_url;
                 link.textContent = item.title;
                 tdTitle.appendChild(link);
+                if (item.attachment_count > 0) {
+                    const attSpan = document.createElement("span");
+                    attSpan.className = "attachment-pill";
+                    attSpan.textContent = `${item.attachment_count} file${item.attachment_count === 1 ? "" : "s"}`;
+                    tdTitle.appendChild(attSpan);
+                }
                 if (item.latest_reply && item.latest_reply.message) {
                     const replyDiv = document.createElement("div");
                     replyDiv.className = "inline-reply-preview";
@@ -967,14 +979,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const quickForm = document.getElementById("quick-request-form");
         const quickTitle = document.getElementById("quick-title");
         const quickDesc = document.getElementById("quick-description");
+        const quickFiles = document.getElementById("quick-attachments");
         const quickBanner = document.getElementById("quick-composer-banner");
         const quickSubmitBtn = document.getElementById("quick-submit-btn");
         const errTitle = document.getElementById("quick-error-title");
         const errCat = document.getElementById("quick-error-category");
         const errDesc = document.getElementById("quick-error-description");
+        const errAttach = document.getElementById("quick-error-attachments");
 
         const clearQuickErrors = () => {
-            [errTitle, errCat, errDesc].forEach((el) => {
+            [errTitle, errCat, errDesc, errAttach].forEach((el) => {
                 if (el) {
                     el.hidden = true;
                     el.textContent = "";
@@ -982,6 +996,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             if (quickTitle) quickTitle.classList.remove("input-error");
             if (quickDesc) quickDesc.classList.remove("input-error");
+            if (quickFiles) quickFiles.classList.remove("input-error");
         };
 
         if (quickForm && quickTitle && quickDesc) {
@@ -1024,9 +1039,15 @@ document.addEventListener("DOMContentLoaded", () => {
                             errDesc.hidden = false;
                             quickDesc.classList.add("input-error");
                         }
+                        if (errors.attachments && errAttach) {
+                            errAttach.textContent = errors.attachments;
+                            errAttach.hidden = false;
+                            if (quickFiles) quickFiles.classList.add("input-error");
+                        }
                     } else {
                         quickTitle.value = "";
                         quickDesc.value = "";
+                        if (quickFiles) quickFiles.value = "";
                         quickDesc.dispatchEvent(new Event("input"));
                         if (quickBanner && payload.ticket) {
                             quickBanner.textContent =

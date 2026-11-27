@@ -6,12 +6,15 @@ import re
 import secrets
 import sqlite3
 import time
+import uuid
 from functools import wraps
-from typing import Callable, TypeVar
+from pathlib import Path
+from typing import Any, Callable, TypeVar
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from flask import abort, current_app, flash, g, redirect, session, url_for
+from werkzeug.utils import secure_filename
 
 from app.db import get_db
 
@@ -306,3 +309,141 @@ def validate_status_transition(
     if target_status not in allowed_map.get(current_status, ()):
         return f"Cannot transition status from {current_status} to {target_status}."
     return None
+
+
+def _detect_safe_attachment_type(payload: bytes, ext: str) -> tuple[str, bool] | None:
+    """Validate file magic bytes against an allow-listed extension to prevent MIME spoofing."""
+    if ext == ".png" and payload.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png", True
+    if ext in (".jpg", ".jpeg") and payload.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg", True
+    if ext == ".gif" and (payload.startswith(b"GIF87a") or payload.startswith(b"GIF89a")):
+        return "image/gif", True
+    if ext == ".webp" and len(payload) >= 12 and payload[:4] == b"RIFF" and payload[8:12] == b"WEBP":
+        return "image/webp", True
+    if ext == ".pdf" and payload.startswith(b"%PDF-"):
+        return "application/pdf", False
+    if ext == ".txt":
+        if b"\x00" in payload:
+            return None
+        try:
+            payload.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+        return "text/plain; charset=utf-8", False
+    return None
+
+
+def validate_uploaded_attachments(
+    files: list[Any],
+    *,
+    existing_count: int = 0,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Validate uploaded files for count, size, extension allow-list, and magic bytes."""
+    non_empty = [f for f in files if f and getattr(f, "filename", "")]
+    if not non_empty:
+        return [], None
+
+    max_count = int(current_app.config["MAX_ATTACHMENTS_PER_TICKET"])
+    if existing_count + len(non_empty) > max_count:
+        return [], f"You can attach up to {max_count} files per submission."
+
+    allowed_exts = tuple(current_app.config["ALLOWED_ATTACHMENT_EXTENSIONS"])
+    max_bytes = int(current_app.config["MAX_CONTENT_LENGTH"])
+    prepared: list[dict[str, Any]] = []
+    total_bytes = 0
+
+    for file_storage in non_empty:
+        raw_name = Path(str(file_storage.filename)).name
+        safe_display = secure_filename(raw_name)[:150]
+        ext = Path(raw_name).suffix.lower()
+
+        if not safe_display or ext not in allowed_exts:
+            return [], (
+                "Unsupported file type. Allowed formats: PNG, JPG, GIF, WEBP, PDF, and TXT."
+            )
+
+        payload = file_storage.read()
+        size = len(payload)
+        if size == 0:
+            return [], f"File '{safe_display}' is empty."
+        if size > max_bytes or (total_bytes + size) > max_bytes:
+            return [], "Attached files exceed the 5 MB total upload limit."
+
+        detected = _detect_safe_attachment_type(payload, ext)
+        if detected is None:
+            return [], f"File '{safe_display}' failed signature validation for {ext}."
+
+        content_type, is_image = detected
+        total_bytes += size
+        prepared.append(
+            {
+                "original_filename": safe_display,
+                "stored_filename": f"{uuid.uuid4().hex}{ext}",
+                "content_type": content_type,
+                "file_size": size,
+                "is_image": 1 if is_image else 0,
+                "payload": payload,
+            }
+        )
+
+    return prepared, None
+
+
+def persist_attachments(
+    db: sqlite3.Connection,
+    feedback_id: int,
+    uploader_id: int,
+    prepared_files: list[dict[str, Any]],
+    created_at: str,
+) -> None:
+    """Write validated attachments to isolated non-static storage and record DB rows."""
+    if not prepared_files:
+        return
+
+    upload_dir = Path(current_app.config["UPLOAD_FOLDER"]).resolve()
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    written_paths: list[Path] = []
+
+    try:
+        for item in prepared_files:
+            dest = (upload_dir / item["stored_filename"]).resolve()
+            if dest.parent != upload_dir:
+                raise ValueError("Unsafe upload path resolved.")
+            dest.write_bytes(item["payload"])
+            written_paths.append(dest)
+
+            db.execute(
+                """
+                INSERT INTO attachments (
+                    feedback_id, uploader_id, original_filename, stored_filename,
+                    content_type, file_size, is_image, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    feedback_id,
+                    uploader_id,
+                    item["original_filename"],
+                    item["stored_filename"],
+                    item["content_type"],
+                    item["file_size"],
+                    item["is_image"],
+                    created_at,
+                ),
+            )
+    except Exception:
+        for path in written_paths:
+            path.unlink(missing_ok=True)
+        raise
+
+
+def remove_stored_attachment_files(stored_filenames: list[str]) -> None:
+    """Delete attachment blobs from disk safely within UPLOAD_FOLDER."""
+    if not stored_filenames:
+        return
+    upload_dir = Path(current_app.config["UPLOAD_FOLDER"]).resolve()
+    for name in stored_filenames:
+        target = (upload_dir / Path(name).name).resolve()
+        if target.parent == upload_dir:
+            target.unlink(missing_ok=True)

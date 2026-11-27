@@ -39,11 +39,13 @@ def login_as(client: FlaskClient, email: str, password: str):
 def app(tmp_path: Path) -> Flask:
     """Provide an isolated Flask app backed by a temporary seeded SQLite database."""
     db_file = tmp_path / "test_portal.db"
+    upload_dir = tmp_path / "uploads"
     test_app = create_app(
         {
             "TESTING": True,
             "SECRET_KEY": TestConfig.SECRET_KEY,
             "DATABASE_PATH": str(db_file),
+            "UPLOAD_FOLDER": str(upload_dir),
             "SESSION_COOKIE_SECURE": False,
             "WTF_CSRF_ENABLED": True,
         }

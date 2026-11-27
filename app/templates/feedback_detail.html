@@ -1,6 +1,46 @@
 {% extends "base.html" %}
 {% block title %}{{ feedback.title }} · {{ 'RepDesk Admin' if g.user.role == 'rep' else 'RepDesk' }}{% endblock %}
 
+{% macro render_attachments(attachments) %}
+    {% if attachments %}
+    <div class="detail-attachments">
+        <h3>Attachments ({{ attachments|length }})</h3>
+        <div class="attachment-grid">
+            {% for att in attachments %}
+                {% if att.is_image %}
+                    <a
+                        href="{{ url_for('student.serve_attachment', attachment_id=att.id) }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="attachment-image-card"
+                    >
+                        <img
+                            src="{{ url_for('student.serve_attachment', attachment_id=att.id) }}"
+                            alt="{{ att.original_filename }}"
+                            loading="lazy"
+                        >
+                        <span class="attachment-caption">
+                            {{ att.original_filename }} · {{ (att.file_size / 1024)|round(1) }} KB
+                        </span>
+                    </a>
+                {% else %}
+                    <a
+                        href="{{ url_for('student.serve_attachment', attachment_id=att.id) }}"
+                        class="attachment-doc-card"
+                    >
+                        <span class="attachment-doc-badge">{{ att.original_filename.rsplit('.', 1)[-1]|upper }}</span>
+                        <span class="attachment-doc-meta">
+                            <strong>{{ att.original_filename }}</strong>
+                            <small class="muted">{{ (att.file_size / 1024)|round(1) }} KB · Download</small>
+                        </span>
+                    </a>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="breadcrumb">
     {% if g.user.role == 'rep' %}
@@ -50,6 +90,7 @@
             </div>
 
             <div class="feedback-body">{{ feedback.description }}</div>
+            {{ render_attachments(attachments) }}
         </article>
 
         <section class="card responses-card">
@@ -218,6 +259,7 @@
                 </div>
 
                 <div class="feedback-body">{{ feedback.description }}</div>
+                {{ render_attachments(attachments) }}
             </article>
 
             <section class="card responses-card">

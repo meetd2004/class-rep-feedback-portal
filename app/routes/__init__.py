@@ -29,6 +29,22 @@ def render_feedback_detail(feedback_id: int, *, require_rep_cohort: bool = False
         (feedback_id,),
     ).fetchall()
 
+    attachments = db.execute(
+        """
+        SELECT
+            id,
+            original_filename,
+            content_type,
+            file_size,
+            is_image,
+            created_at
+        FROM attachments
+        WHERE feedback_id = ?
+        ORDER BY id ASC;
+        """,
+        (feedback_id,),
+    ).fetchall()
+
     allowed_next_statuses = current_app.config["ALLOWED_STATUS_TRANSITIONS"].get(
         feedback["status"], ()
     )
@@ -37,6 +53,7 @@ def render_feedback_detail(feedback_id: int, *, require_rep_cohort: bool = False
         "feedback_detail.html",
         feedback=feedback,
         responses=responses,
+        attachments=attachments,
         allowed_next_statuses=allowed_next_statuses,
     )
 

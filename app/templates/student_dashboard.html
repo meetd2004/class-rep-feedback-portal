@@ -75,6 +75,7 @@
                 id="quick-request-form"
                 action="{{ url_for('student.create_feedback') }}"
                 method="post"
+                enctype="multipart/form-data"
                 class="stack-form"
                 novalidate
             >
@@ -129,6 +130,19 @@
                         <span class="muted" id="quick-description-counter">0 / 2000 characters</span>
                     </div>
                     <p id="quick-error-description" class="field-error" role="alert" hidden></p>
+                </div>
+
+                <div class="form-group">
+                    <label for="quick-attachments">Attach Pictures or Files (Optional)</label>
+                    <input
+                        id="quick-attachments"
+                        name="attachments"
+                        type="file"
+                        multiple
+                        accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt"
+                    >
+                    <span class="muted">Up to 3 files (PNG, JPG, GIF, WEBP, PDF, TXT · max 5 MB total).</span>
+                    <p id="quick-error-attachments" class="field-error" role="alert" hidden></p>
                 </div>
 
                 <div class="form-actions">
@@ -218,6 +232,9 @@
                             <a href="{{ url_for('student.view_feedback', feedback_id=item.id) }}" class="row-link">
                                 {{ item.title }}
                             </a>
+                            {% if item.attachment_count %}
+                                <span class="attachment-pill">{{ item.attachment_count }} file{{ 's' if item.attachment_count != 1 else '' }}</span>
+                            {% endif %}
                             {% if item.latest_reply_message %}
                                 <div class="inline-reply-preview">
                                     <strong>{{ item.latest_reply_by }}:</strong>

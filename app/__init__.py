@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Flask, Response, g, render_template, request
+from flask import Flask, Response, g, jsonify, render_template, request
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
 from app.config import Config
@@ -108,6 +108,21 @@ def create_app(test_config: dict[str, Any] | type[Config] | None = None) -> Flas
                 message="The requested page or feedback item does not exist.",
             ),
             404,
+        )
+
+    @app.errorhandler(413)
+    def handle_payload_too_large(_error: Exception) -> object:
+        msg = "Uploaded files exceed the 5 MB total size limit."
+        if request.headers.get("X-Requested-With") == "fetch":
+            return jsonify({"ok": False, "errors": {"attachments": msg}}), 413
+        return (
+            render_template(
+                "error.html",
+                status_code=413,
+                title="Upload Too Large",
+                message=msg,
+            ),
+            413,
         )
 
     @app.errorhandler(500)

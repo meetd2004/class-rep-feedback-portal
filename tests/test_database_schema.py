@@ -14,7 +14,7 @@ from app.security import hash_password
 def test_fresh_database_migration_creates_tables_and_indexes(tmp_path: Path) -> None:
     db_path = tmp_path / "fresh_schema.db"
     applied = run_migrations(db_path)
-    assert applied == ["001_initial_schema.sql"]
+    assert applied == ["001_initial_schema.sql", "002_attachments.sql"]
 
     # Re-running migrations should be idempotent.
     assert run_migrations(db_path) == []
@@ -36,11 +36,12 @@ def test_fresh_database_migration_creates_tables_and_indexes(tmp_path: Path) -> 
     finally:
         conn.close()
 
-    assert {"schema_migrations", "users", "feedback", "responses"}.issubset(tables)
+    assert {"schema_migrations", "users", "feedback", "responses", "attachments"}.issubset(tables)
     assert {
         "idx_feedback_author_id",
         "idx_feedback_cohort_status",
         "idx_responses_feedback_id",
+        "idx_attachments_feedback_id",
     }.issubset(indexes)
 
 
@@ -93,7 +94,7 @@ def test_database_check_constraints_reject_invalid_role_category_and_status(tmp_
 def test_reset_and_seed_db_produces_repeatable_fictional_dataset(tmp_path: Path) -> None:
     db_path = tmp_path / "repeatable_demo.db"
     applied_first = reset_and_seed_db(db_path, hash_password)
-    assert applied_first == ["001_initial_schema.sql"]
+    assert applied_first == ["001_initial_schema.sql", "002_attachments.sql"]
 
     # Mutate database, then verify reset restores exact baseline counts.
     conn = connect_sqlite(db_path)
@@ -104,7 +105,7 @@ def test_reset_and_seed_db_produces_repeatable_fictional_dataset(tmp_path: Path)
         conn.close()
 
     applied_second = reset_and_seed_db(db_path, hash_password)
-    assert applied_second == ["001_initial_schema.sql"]
+    assert applied_second == ["001_initial_schema.sql", "002_attachments.sql"]
 
     conn = connect_sqlite(db_path)
     try:
