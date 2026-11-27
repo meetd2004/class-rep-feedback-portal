@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Account & Security · RepDesk{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+    <a href="{{ url_for('auth.index') }}">&larr; Back to Dashboard</a>
+</div>
+
+<section class="page-head">
+    <div>
+        <span class="eyebrow">Account Settings</span>
+        <h1>Profile &amp; Password Security</h1>
+        <p class="muted">Review your portal membership details and keep your credentials up to date.</p>
+    </div>
+</section>
+
+<div class="account-grid">
+    <section class="card">
+        <h2>Account Details</h2>
+        <dl class="ticket-meta-list">
+            <div class="meta-pair">
+                <dt>Full Name</dt>
+                <dd><strong>{{ profile.full_name }}</strong></dd>
+            </div>
+            <div class="meta-pair">
+                <dt>Email</dt>
+                <dd>{{ profile.email }}</dd>
+            </div>
+            <div class="meta-pair">
+                <dt>Role</dt>
+                <dd>
+                    <span class="role-pill role-{{ profile.role }}">
+                        {{ 'Class Rep Admin' if profile.role == 'rep' else 'Student' }}
+                    </span>
+                </dd>
+            </div>
+            <div class="meta-pair">
+                <dt>Assigned Cohort</dt>
+                <dd>{{ profile.cohort }}</dd>
+            </div>
+            <div class="meta-pair">
+                <dt>Member Since</dt>
+                <dd class="muted">{{ profile.created_at }}</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="card">
+        <h2>Update Password</h2>
+        <p class="muted">Passwords must be at least 8 characters and differ from your current password.</p>
+
+        <form action="{{ url_for('auth.change_password') }}" method="post" class="stack-form admin-form-top" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="form-group">
+                <label for="current_password">Current Password <span class="required">*</span></label>
+                <input
+                    id="current_password"
+                    name="current_password"
+                    type="password"
+                    autocomplete="current-password"
+                    class="{{ 'input-error' if errors.get('current') else '' }}"
+                    required
+                >
+                {% if errors.get('current') %}
+                    <p class="field-error" role="alert">{{ errors['current'] }}</p>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="new_password">New Password <span class="required">*</span></label>
+                <input
+                    id="new_password"
+                    name="new_password"
+                    type="password"
+                    minlength="8"
+                    autocomplete="new-password"
+                    class="{{ 'input-error' if errors.get('new') else '' }}"
+                    required
+                >
+                {% if errors.get('new') %}
+                    <p class="field-error" role="alert">{{ errors['new'] }}</p>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">Confirm New Password <span class="required">*</span></label>
+                <input
+                    id="confirm_password"
+                    name="confirm_password"
+                    type="password"
+                    minlength="8"
+                    autocomplete="new-password"
+                    class="{{ 'input-error' if errors.get('confirm') else '' }}"
+                    required
+                >
+                {% if errors.get('confirm') %}
+                    <p class="field-error" role="alert">{{ errors['confirm'] }}</p>
+                {% endif %}
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Update Password</button>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}

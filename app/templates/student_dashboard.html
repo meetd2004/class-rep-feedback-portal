@@ -32,22 +32,22 @@
     </div>
 
     <section class="stats-grid" aria-label="Submission Summary">
-        <div class="stat-card">
+        <button type="button" class="stat-card stat-link stat-btn {{ 'stat-active' if not selected_status else '' }}" data-student-stat-filter="all">
             <span class="stat-label">Total Submitted</span>
             <strong class="stat-value" data-student-stat="total">{{ counts.total }}</strong>
-        </div>
-        <div class="stat-card">
+        </button>
+        <button type="button" class="stat-card stat-link stat-btn {{ 'stat-active' if selected_status == 'New' else '' }}" data-student-stat-filter="new">
             <span class="stat-label">New</span>
             <strong class="stat-value stat-new" data-student-stat="New">{{ counts['New'] }}</strong>
-        </div>
-        <div class="stat-card">
+        </button>
+        <button type="button" class="stat-card stat-link stat-btn {{ 'stat-active' if selected_status == 'In Review' else '' }}" data-student-stat-filter="in-review">
             <span class="stat-label">In Review</span>
             <strong class="stat-value stat-review" data-student-stat="In Review">{{ counts['In Review'] }}</strong>
-        </div>
-        <div class="stat-card">
+        </button>
+        <button type="button" class="stat-card stat-link stat-btn {{ 'stat-active' if selected_status == 'Resolved' else '' }}" data-student-stat-filter="resolved">
             <span class="stat-label">Resolved</span>
             <strong class="stat-value stat-resolved" data-student-stat="Resolved">{{ counts['Resolved'] }}</strong>
-        </div>
+        </button>
     </section>
 
     <section class="card quick-composer-card" aria-labelledby="quick-composer-heading">
@@ -141,22 +141,55 @@
     </section>
 
     <section class="card table-card">
-        <div class="dashboard-toolbar" id="student-toolbar" {% if not submissions %}hidden{% endif %}>
-            <div class="search-wrap">
-                <input
-                    id="student-search"
-                    type="search"
-                    placeholder="Filter submissions by title or category..."
-                    aria-label="Filter submissions by title or category"
-                >
+        <form action="{{ url_for('student.dashboard') }}" method="get" class="dashboard-toolbar" id="student-toolbar" {% if counts.total == 0 %}hidden{% endif %}>
+            <div class="student-filter-grid">
+                <div class="search-wrap">
+                    <label for="student-search" class="sr-only">Search submissions</label>
+                    <input
+                        id="student-search"
+                        name="q"
+                        type="search"
+                        value="{{ search_query }}"
+                        placeholder="Search by title or topic..."
+                        aria-label="Search submissions by title or topic"
+                    >
+                </div>
+
+                <div class="toolbar-select-group">
+                    <label for="student-category-filter" class="sr-only">Filter by topic category</label>
+                    <select id="student-category-filter" name="category" aria-label="Filter by topic category">
+                        <option value="">All Topics</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat }}" {{ 'selected' if selected_category == cat else '' }}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="toolbar-select-group">
+                    <label for="student-sort" class="sr-only">Sort submissions</label>
+                    <select id="student-sort" name="sort" aria-label="Sort submissions">
+                        <option value="newest" {{ 'selected' if sort_by == 'newest' else '' }}>Newest First</option>
+                        <option value="oldest" {{ 'selected' if sort_by == 'oldest' else '' }}>Oldest First</option>
+                        <option value="status" {{ 'selected' if sort_by == 'status' else '' }}>By Status</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-secondary btn-sm no-js-only">Apply</button>
             </div>
-            <div class="status-filter-pills" role="group" aria-label="Filter by status">
-                <button type="button" class="filter-pill active" data-status-filter="all">All</button>
-                <button type="button" class="filter-pill" data-status-filter="new">New</button>
-                <button type="button" class="filter-pill" data-status-filter="in-review">In Review</button>
-                <button type="button" class="filter-pill" data-status-filter="resolved">Resolved</button>
+
+            <div class="toolbar-bottom-row">
+                <div class="status-filter-pills" role="group" aria-label="Filter by status">
+                    <button type="button" class="filter-pill {{ 'active' if not selected_status else '' }}" data-status-filter="all">All</button>
+                    <button type="button" class="filter-pill {{ 'active' if selected_status == 'New' else '' }}" data-status-filter="new">New</button>
+                    <button type="button" class="filter-pill {{ 'active' if selected_status == 'In Review' else '' }}" data-status-filter="in-review">In Review</button>
+                    <button type="button" class="filter-pill {{ 'active' if selected_status == 'Resolved' else '' }}" data-status-filter="resolved">Resolved</button>
+                </div>
+                <div class="toolbar-meta">
+                    <span class="muted" id="student-match-summary">Showing {{ submissions|length }} of {{ counts.total }} submissions</span>
+                    <button type="button" id="student-clear-filters" class="btn btn-secondary btn-sm" hidden>Reset Filters</button>
+                </div>
             </div>
-        </div>
+        </form>
 
         <div class="table-wrap" id="student-table-wrap" {% if not submissions %}hidden{% endif %}>
             <table class="data-table" id="student-submissions-table">
@@ -175,8 +208,10 @@
                     {% for item in submissions %}
                     <tr
                         data-feedback-row
+                        data-id="{{ item.id }}"
+                        data-category="{{ item.category }}"
                         data-status="{{ item.status|lower|replace(' ', '-') }}"
-                        data-search="{{ (item.title ~ ' ' ~ item.category)|lower }}"
+                        data-search="{{ (item.title ~ ' ' ~ item.category ~ ' #' ~ item.id)|lower }}"
                     >
                         <td><span class="ticket-id-badge">#{{ item.id }}</span></td>
                         <td>
@@ -216,10 +251,11 @@
         </div>
 
         <div id="student-filter-empty" class="empty-state compact" hidden>
-            <p class="muted">No submissions match your search or status filter.</p>
+            <p class="muted">No submissions match your active search, topic, or status filters.</p>
+            <button type="button" id="student-reset-filters-empty" class="btn btn-secondary btn-sm">Reset Filters</button>
         </div>
 
-        <div class="empty-state" id="student-empty-state" {% if submissions %}hidden{% endif %}>
+        <div class="empty-state" id="student-empty-state" {% if counts.total > 0 %}hidden{% endif %}>
             <h2>No feedback submitted yet</h2>
             <p class="muted">
                 Use the request form above to raise a concern or suggestion regarding lectures, assessments, timetables, or learning resources.

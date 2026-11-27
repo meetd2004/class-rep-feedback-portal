@@ -9,6 +9,7 @@
     <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </head>
 <body class="{{ 'theme-admin' if g.user and g.user.role == 'rep' else 'theme-student' }}">
+    <a href="#main-content" class="skip-link">Skip to main content</a>
     {% if g.user and g.user.role == 'rep' %}
     <div
         class="admin-shell"
@@ -88,6 +89,12 @@
                         <span class="role-pill role-rep">Class Rep Admin</span>
                     </div>
                 </div>
+                <a
+                    href="{{ url_for('auth.account') }}"
+                    class="admin-nav-link {{ 'active' if request.endpoint == 'auth.account' else '' }}"
+                >
+                    <span>Account &amp; Security</span>
+                </a>
                 <form action="{{ url_for('auth.logout') }}" method="post" class="admin-logout-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline btn-full btn-sm">Sign Out</button>
@@ -109,7 +116,7 @@
                 </div>
             </header>
 
-            <main class="admin-main">
+            <main class="admin-main" id="main-content">
                 <div id="admin-live-alert" class="alert alert-info admin-live-alert" role="status" hidden>
                     <div id="admin-live-alert-text"></div>
                     <div class="admin-live-alert-actions">
@@ -160,6 +167,12 @@
                     My Feedback
                 </a>
                 <a
+                    href="{{ url_for('auth.account') }}"
+                    class="nav-link {{ 'active' if request.endpoint == 'auth.account' else '' }}"
+                >
+                    Account
+                </a>
+                <a
                     href="{{ url_for('student.create_feedback') }}"
                     class="btn btn-primary btn-sm"
                 >
@@ -183,7 +196,7 @@
 
     {% block hero %}{% endblock %}
 
-    <main class="container main-content">
+    <main class="container main-content" id="main-content">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-stack" role="status" aria-live="polite">

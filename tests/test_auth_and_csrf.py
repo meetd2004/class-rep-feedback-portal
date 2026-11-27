@@ -155,3 +155,49 @@ def test_login_rate_limiting_blocks_excessive_failed_attempts(client) -> None:
     )
     assert throttled.status_code == 429
     assert "Too many failed sign-in attempts" in throttled.get_data(as_text=True)
+
+
+def test_account_profile_and_password_change_flow(client) -> None:
+    assert client.get("/account", follow_redirects=False).status_code == 302
+
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+    acc_page = client.get("/account")
+    assert acc_page.status_code == 200
+    assert "Aoife Brennan" in acc_page.get_data(as_text=True)
+    token = extract_csrf_token(acc_page.get_data(as_text=True))
+
+    # Wrong current password or mismatched confirmation returns 400
+    bad_pw = client.post(
+        "/account/password",
+        data={
+            "csrf_token": token,
+            "current_password": "WrongPassword",
+            "new_password": "NewSecurePassword!2026",
+            "confirm_password": "DifferentPassword!2026",
+        },
+    )
+    assert bad_pw.status_code == 400
+    bad_html = bad_pw.get_data(as_text=True)
+    assert "Current password is incorrect." in bad_html
+    assert "Password confirmation does not match." in bad_html
+
+    # Valid password change succeeds and authenticates with new password
+    ok_pw = client.post(
+        "/account/password",
+        data={
+            "csrf_token": token,
+            "current_password": "StudentDemo!2026",
+            "new_password": "UpdatedDemoPass!2026",
+            "confirm_password": "UpdatedDemoPass!2026",
+        },
+        follow_redirects=True,
+    )
+    assert ok_pw.status_code == 200
+    assert "Your password has been updated" in ok_pw.get_data(as_text=True)
+
+    logout_token = extract_csrf_token(ok_pw.get_data(as_text=True))
+    client.post("/logout", data={"csrf_token": logout_token})
+
+    relogin = login_as(client, "aoife.brennan@nci-demo.example", "UpdatedDemoPass!2026")
+    assert relogin.status_code == 302
+    assert relogin.headers["Location"].endswith("/student/dashboard")

@@ -166,52 +166,166 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 4. Student Dashboard live search, status filter, quick composer, and real-time sync
+    // 4. Student Dashboard live search, topic filter, status filter, sort, and clickable stats
     const searchInput = document.getElementById("student-search");
+    const categorySelect = document.getElementById("student-category-filter");
+    const sortSelect = document.getElementById("student-sort");
     const statusFilterButtons = document.querySelectorAll("[data-status-filter]");
+    const statFilterButtons = document.querySelectorAll("[data-student-stat-filter]");
+    const clearFiltersBtn = document.getElementById("student-clear-filters");
+    const resetFiltersEmptyBtn = document.getElementById("student-reset-filters-empty");
+    const matchSummaryEl = document.getElementById("student-match-summary");
     const filterEmptyEl = document.getElementById("student-filter-empty");
+    const studentTableWrap = document.getElementById("student-table-wrap");
     let activeStudentStatus = "all";
 
+    const activeStatusBtn = document.querySelector("[data-status-filter].active");
+    if (activeStatusBtn) {
+        activeStudentStatus = activeStatusBtn.getAttribute("data-status-filter") || "all";
+    }
+
+    const syncStatusButtonHighlights = (statusKey) => {
+        statusFilterButtons.forEach((btn) => {
+            btn.classList.toggle(
+                "active",
+                (btn.getAttribute("data-status-filter") || "all") === statusKey
+            );
+        });
+        statFilterButtons.forEach((btn) => {
+            btn.classList.toggle(
+                "stat-active",
+                (btn.getAttribute("data-student-stat-filter") || "all") === statusKey
+            );
+        });
+    };
+
+    const sortStudentRows = () => {
+        const tbody = document.getElementById("student-submissions-tbody");
+        if (!tbody || !sortSelect) {
+            return;
+        }
+        const sortBy = sortSelect.value || "newest";
+        const rows = Array.from(tbody.querySelectorAll("[data-feedback-row]"));
+        const statusOrder = { new: 1, "in-review": 2, resolved: 3 };
+
+        rows.sort((a, b) => {
+            const idA = parseInt(a.getAttribute("data-id") || "0", 10);
+            const idB = parseInt(b.getAttribute("data-id") || "0", 10);
+            if (sortBy === "oldest") {
+                return idA - idB;
+            }
+            if (sortBy === "status") {
+                const rankA = statusOrder[a.getAttribute("data-status") || ""] || 9;
+                const rankB = statusOrder[b.getAttribute("data-status") || ""] || 9;
+                return rankA !== rankB ? rankA - rankB : idB - idA;
+            }
+            return idB - idA;
+        });
+
+        rows.forEach((row) => tbody.appendChild(row));
+    };
+
     const applyStudentFilters = () => {
+        sortStudentRows();
         const feedbackRows = document.querySelectorAll("[data-feedback-row]");
+        const term = searchInput ? searchInput.value.trim().toLowerCase() : "";
+        const selectedCategory = categorySelect ? categorySelect.value : "";
+        const sortBy = sortSelect ? sortSelect.value : "newest";
+        const hasActiveFilter =
+            Boolean(term) ||
+            Boolean(selectedCategory) ||
+            activeStudentStatus !== "all" ||
+            sortBy !== "newest";
+
+        if (clearFiltersBtn) {
+            clearFiltersBtn.hidden = !hasActiveFilter;
+        }
+
         if (!feedbackRows.length) {
             if (filterEmptyEl) {
                 filterEmptyEl.hidden = true;
             }
+            if (matchSummaryEl) {
+                matchSummaryEl.textContent = "Showing 0 of 0 submissions";
+            }
             return;
         }
-        const term = searchInput ? searchInput.value.trim().toLowerCase() : "";
-        let visibleCount = 0;
 
+        let visibleCount = 0;
         feedbackRows.forEach((row) => {
             const rowStatus = row.getAttribute("data-status") || "";
+            const rowCategory = row.getAttribute("data-category") || "";
             const rowSearch = row.getAttribute("data-search") || "";
             const statusMatch = activeStudentStatus === "all" || rowStatus === activeStudentStatus;
+            const categoryMatch = !selectedCategory || rowCategory === selectedCategory;
             const textMatch = !term || rowSearch.includes(term);
-            const visible = statusMatch && textMatch;
+            const visible = statusMatch && categoryMatch && textMatch;
             row.hidden = !visible;
             if (visible) {
                 visibleCount += 1;
             }
         });
 
+        if (matchSummaryEl) {
+            matchSummaryEl.textContent = `Showing ${visibleCount} of ${feedbackRows.length} submissions`;
+        }
+        if (studentTableWrap) {
+            studentTableWrap.hidden = visibleCount === 0;
+        }
         if (filterEmptyEl) {
             filterEmptyEl.hidden = visibleCount > 0;
         }
     };
 
+    const resetAllStudentFilters = () => {
+        activeStudentStatus = "all";
+        if (searchInput) searchInput.value = "";
+        if (categorySelect) categorySelect.value = "";
+        if (sortSelect) sortSelect.value = "newest";
+        syncStatusButtonHighlights("all");
+        applyStudentFilters();
+    };
+
     if (searchInput) {
         searchInput.addEventListener("input", applyStudentFilters);
+    }
+    if (categorySelect) {
+        categorySelect.addEventListener("change", applyStudentFilters);
+    }
+    if (sortSelect) {
+        sortSelect.addEventListener("change", applyStudentFilters);
+    }
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener("click", resetAllStudentFilters);
+    }
+    if (resetFiltersEmptyBtn) {
+        resetFiltersEmptyBtn.addEventListener("click", resetAllStudentFilters);
     }
 
     statusFilterButtons.forEach((btn) => {
         btn.addEventListener("click", () => {
             activeStudentStatus = btn.getAttribute("data-status-filter") || "all";
-            statusFilterButtons.forEach((b) => b.classList.remove("active"));
-            btn.classList.add("active");
+            syncStatusButtonHighlights(activeStudentStatus);
             applyStudentFilters();
         });
     });
+
+    statFilterButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+            activeStudentStatus = btn.getAttribute("data-student-stat-filter") || "all";
+            syncStatusButtonHighlights(activeStudentStatus);
+            applyStudentFilters();
+        });
+    });
+
+    const studentToolbarEl = document.getElementById("student-toolbar");
+    if (studentToolbarEl) {
+        studentToolbarEl.addEventListener("submit", (event) => {
+            event.preventDefault();
+            applyStudentFilters();
+        });
+        applyStudentFilters();
+    }
 
     // 5. Accessible In-Page Delete Confirmation Modal (event-delegated for dynamically synced rows)
     const modal = document.getElementById("confirm-modal");
@@ -562,7 +676,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const studentTbody = document.getElementById("student-submissions-tbody");
-        const studentTableWrap = document.getElementById("student-table-wrap");
         const studentToolbar = document.getElementById("student-toolbar");
         const studentEmpty = document.getElementById("student-empty-state");
         const studentLiveAlert = document.getElementById("student-live-alert");
@@ -616,8 +729,10 @@ document.addEventListener("DOMContentLoaded", () => {
             items.forEach((item) => {
                 const tr = document.createElement("tr");
                 tr.setAttribute("data-feedback-row", "");
+                tr.setAttribute("data-id", String(item.id));
+                tr.setAttribute("data-category", item.category);
                 tr.setAttribute("data-status", item.status.toLowerCase().replace(/\s+/g, "-"));
-                tr.setAttribute("data-search", `${item.title} ${item.category}`.toLowerCase());
+                tr.setAttribute("data-search", `${item.title} ${item.category} #${item.id}`.toLowerCase());
 
                 const tdId = document.createElement("td");
                 const idBadge = document.createElement("span");

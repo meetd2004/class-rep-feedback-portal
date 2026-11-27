@@ -324,3 +324,25 @@ def test_student_quick_request_ajax_and_live_sync_reflects_in_admin_queue(client
     admin_data = admin_api.get_json()
     assert admin_data["latest_ticket"]["id"] == created_id
     assert admin_data["latest_ticket"]["title"] == "Need recording captions enabled for Week 6"
+
+
+def test_student_dashboard_filters_by_topic_status_search_and_sort(client) -> None:
+    login_as(client, "aoife.brennan@nci-demo.example", "StudentDemo!2026")
+
+    # Category + Status filter on server dashboard
+    lectures_new = client.get("/student/dashboard?category=Lectures&status=New").get_data(
+        as_text=True
+    )
+    assert "Audio echo in Week 5 Cryptography recording" in lectures_new
+    assert "Broken lab VM mirror link in Week 3 Moodle folder" not in lectures_new
+
+    # Search + Sort on student live API
+    api_sorted = client.get("/student/api/my-feedback?sort=oldest")
+    assert api_sorted.status_code == 200
+    ids = [item["id"] for item in api_sorted.get_json()["submissions"]]
+    assert ids == sorted(ids)
+
+    api_search = client.get("/student/api/my-feedback?q=Cryptography")
+    assert api_search.status_code == 200
+    titles = [item["title"] for item in api_search.get_json()["submissions"]]
+    assert titles == ["Audio echo in Week 5 Cryptography recording"]

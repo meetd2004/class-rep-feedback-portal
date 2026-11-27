@@ -30,8 +30,18 @@ from app.security import (
 student_bp = Blueprint("student", __name__)
 
 
-def _fetch_student_submissions(student_id: int, cohort: str) -> list[sqlite3.Row]:
-    """Return submissions authored by the given student within their cohort."""
+def _fetch_student_submissions(
+    student_id: int,
+    cohort: str,
+    selected_category: str = "",
+    selected_status: str = "",
+    search_query: str = "",
+    sort_by: str = "newest",
+) -> list[sqlite3.Row]:
+    """Return submissions authored by the given student with optional allow-listed filters."""
+    escaped_q = search_query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    like_pattern = f"%{escaped_q}%" if search_query else ""
+
     db = get_db()
     return db.execute(
         """
@@ -45,10 +55,50 @@ def _fetch_student_submissions(student_id: int, cohort: str) -> list[sqlite3.Row
             (SELECT COUNT(*) FROM responses AS r WHERE r.feedback_id = f.id) AS response_count
         FROM feedback AS f
         WHERE f.author_id = ? AND f.cohort = ?
-        ORDER BY f.id DESC;
+          AND (? = '' OR f.category = ?)
+          AND (? = '' OR f.status = ?)
+          AND (? = '' OR lower(f.title) LIKE ? ESCAPE '\\' OR lower(f.category) LIKE ? ESCAPE '\\')
+        ORDER BY
+            CASE WHEN ? = 'status' THEN
+                CASE f.status WHEN 'New' THEN 1 WHEN 'In Review' THEN 2 ELSE 3 END
+            END ASC,
+            CASE WHEN ? = 'oldest' THEN f.id END ASC,
+            f.id DESC;
         """,
-        (student_id, cohort),
+        (
+            student_id,
+            cohort,
+            selected_category,
+            selected_category,
+            selected_status,
+            selected_status,
+            search_query,
+            like_pattern,
+            like_pattern,
+            sort_by,
+            sort_by,
+        ),
     ).fetchall()
+
+
+def _parse_student_filters() -> tuple[str, str, str, str]:
+    """Validate and normalize student dashboard query parameters."""
+    categories = current_app.config["ALLOWED_CATEGORIES"]
+    statuses = current_app.config["ALLOWED_STATUSES"]
+
+    selected_category = request.args.get("category", "").strip()
+    selected_status = request.args.get("status", "").strip()
+    search_query = request.args.get("q", "").strip()[:80]
+    sort_by = request.args.get("sort", "newest").strip()
+
+    if selected_category not in categories:
+        selected_category = ""
+    if selected_status not in statuses:
+        selected_status = ""
+    if sort_by not in ("newest", "oldest", "status"):
+        sort_by = "newest"
+
+    return selected_category, selected_status, search_query, sort_by
 
 
 def _compute_student_counts(submissions: list[sqlite3.Row]) -> dict[str, int]:
@@ -65,8 +115,17 @@ def _compute_student_counts(submissions: list[sqlite3.Row]) -> dict[str, int]:
 @role_required("student")
 def dashboard() -> str:
     """Display only the signed-in student's own feedback submissions and quick request UI."""
-    submissions = _fetch_student_submissions(g.user["id"], g.user["cohort"])
-    counts = _compute_student_counts(submissions)
+    all_submissions = _fetch_student_submissions(g.user["id"], g.user["cohort"])
+    counts = _compute_student_counts(all_submissions)
+    selected_category, selected_status, search_query, sort_by = _parse_student_filters()
+    submissions = _fetch_student_submissions(
+        g.user["id"],
+        g.user["cohort"],
+        selected_category,
+        selected_status,
+        search_query,
+        sort_by,
+    )
     categories = current_app.config["ALLOWED_CATEGORIES"]
 
     return render_template(
@@ -74,6 +133,10 @@ def dashboard() -> str:
         submissions=submissions,
         counts=counts,
         categories=categories,
+        selected_category=selected_category,
+        selected_status=selected_status,
+        search_query=search_query,
+        sort_by=sort_by,
     )
 
 
@@ -81,8 +144,17 @@ def dashboard() -> str:
 @role_required("student")
 def my_feedback_api() -> object:
     """Return live status, reply counts, and submissions scoped to the signed-in student."""
-    submissions = _fetch_student_submissions(g.user["id"], g.user["cohort"])
-    counts = _compute_student_counts(submissions)
+    all_submissions = _fetch_student_submissions(g.user["id"], g.user["cohort"])
+    counts = _compute_student_counts(all_submissions)
+    selected_category, selected_status, search_query, sort_by = _parse_student_filters()
+    submissions = _fetch_student_submissions(
+        g.user["id"],
+        g.user["cohort"],
+        selected_category,
+        selected_status,
+        search_query,
+        sort_by,
+    )
 
     items = [
         {
@@ -91,6 +163,7 @@ def my_feedback_api() -> object:
             "category": row["category"],
             "status": row["status"],
             "response_count": int(row["response_count"]),
+            "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "view_url": url_for("student.view_feedback", feedback_id=row["id"]),
             "edit_url": url_for("student.edit_feedback", feedback_id=row["id"]),
