@@ -36,6 +36,7 @@ def test_student_cannot_view_edit_or_delete_another_students_feedback(app, clien
 
     # Horizontal IDOR attempts must be denied with 403
     assert client.get(f"/feedback/{fid}").status_code == 403
+    assert client.get(f"/feedback/{fid}/live").status_code == 403
     assert client.get(f"/feedback/{fid}/edit").status_code == 403
 
     token = extract_csrf_token(client.get("/student/dashboard").get_data(as_text=True))

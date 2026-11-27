@@ -156,21 +156,41 @@ def my_feedback_api() -> object:
         sort_by,
     )
 
-    items = [
-        {
-            "id": int(row["id"]),
-            "title": row["title"],
-            "category": row["category"],
-            "status": row["status"],
-            "response_count": int(row["response_count"]),
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"],
-            "view_url": url_for("student.view_feedback", feedback_id=row["id"]),
-            "edit_url": url_for("student.edit_feedback", feedback_id=row["id"]),
-            "delete_url": url_for("student.delete_feedback", feedback_id=row["id"]),
-        }
-        for row in submissions
-    ]
+    items = []
+    db = get_db()
+    for row in submissions:
+        latest_resp = db.execute(
+            """
+            SELECT r.message, r.created_at, u.full_name AS rep_name
+            FROM responses AS r
+            JOIN users AS u ON u.id = r.rep_id
+            WHERE r.feedback_id = ?
+            ORDER BY r.id DESC
+            LIMIT 1;
+            """,
+            (row["id"],),
+        ).fetchone()
+        items.append(
+            {
+                "id": int(row["id"]),
+                "title": row["title"],
+                "category": row["category"],
+                "status": row["status"],
+                "response_count": int(row["response_count"]),
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+                "latest_reply": {
+                    "rep_name": latest_resp["rep_name"],
+                    "message": latest_resp["message"][:120],
+                    "created_at": latest_resp["created_at"],
+                }
+                if latest_resp
+                else None,
+                "view_url": url_for("student.view_feedback", feedback_id=row["id"]),
+                "edit_url": url_for("student.edit_feedback", feedback_id=row["id"]),
+                "delete_url": url_for("student.delete_feedback", feedback_id=row["id"]),
+            }
+        )
 
     return jsonify({"counts": counts, "submissions": items})
 
@@ -252,6 +272,42 @@ def create_feedback() -> object:
 def view_feedback(feedback_id: int) -> str:
     """View a feedback item and its rep responses (author student or assigned rep only)."""
     return render_feedback_detail(feedback_id)
+
+
+@student_bp.route("/feedback/<int:feedback_id>/live")
+@login_required
+def feedback_live_api(feedback_id: int) -> object:
+    """Return live status and official responses for an authorized feedback submission."""
+    feedback = get_authorized_feedback(feedback_id, g.user)
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT r.id, r.message, r.created_at, u.full_name AS rep_name
+        FROM responses AS r
+        JOIN users AS u ON u.id = r.rep_id
+        WHERE r.feedback_id = ?
+        ORDER BY r.created_at ASC, r.id ASC;
+        """,
+        (feedback_id,),
+    ).fetchall()
+
+    return jsonify(
+        {
+            "id": int(feedback["id"]),
+            "status": feedback["status"],
+            "updated_at": feedback["updated_at"],
+            "response_count": len(rows),
+            "responses": [
+                {
+                    "id": int(row["id"]),
+                    "rep_name": row["rep_name"],
+                    "message": row["message"],
+                    "created_at": row["created_at"],
+                }
+                for row in rows
+            ],
+        }
+    )
 
 
 @student_bp.route("/feedback/<int:feedback_id>/edit", methods=["GET", "POST"])

@@ -852,8 +852,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     const prev = snapshotMap.get(item.id);
                     if (prev && (prev.status !== item.status || item.response_count > prev.responses)) {
                         if (studentLiveAlert && studentLiveText && studentLiveLink) {
-                            studentLiveText.textContent =
-                                `Ticket #${item.id} "${item.title}" updated — Status: ${item.status}, Replies: ${item.response_count}`;
+                            if (item.response_count > prev.responses && item.latest_reply) {
+                                studentLiveText.textContent =
+                                    `New reply from ${item.latest_reply.rep_name} on Ticket #${item.id} "${item.title}": "${item.latest_reply.message}"`;
+                            } else {
+                                studentLiveText.textContent =
+                                    `Ticket #${item.id} "${item.title}" updated — Status: ${item.status}, Replies: ${item.response_count}`;
+                            }
                             studentLiveLink.href = item.view_url;
                             studentLiveAlert.hidden = false;
                         }
@@ -957,6 +962,168 @@ document.addEventListener("DOMContentLoaded", () => {
         document.addEventListener("visibilitychange", () => {
             if (!document.hidden) {
                 syncStudentFeedback();
+            }
+        });
+    }
+
+    // 11. Student Ticket Detail Real-Time Reply & Status Sync
+    const detailShell = document.getElementById("student-detail-shell");
+    if (detailShell) {
+        const detailPollUrl = detailShell.getAttribute("data-detail-poll-url");
+        let lastStatus = detailShell.getAttribute("data-detail-status") || "";
+        let lastCount = parseInt(detailShell.getAttribute("data-detail-count") || "0", 10);
+
+        const detailAlert = document.getElementById("detail-live-alert");
+        const detailAlertText = document.getElementById("detail-live-alert-text");
+        const detailAlertDismiss = document.getElementById("detail-live-alert-dismiss");
+        const responseList = document.getElementById("detail-response-list");
+        const responseEmpty = document.getElementById("detail-response-empty");
+        const studentActions = document.getElementById("detail-student-actions");
+        const lockRuleText = document.getElementById("detail-lock-rule-text");
+
+        if (detailAlertDismiss && detailAlert) {
+            detailAlertDismiss.addEventListener("click", () => {
+                detailAlert.hidden = true;
+            });
+        }
+
+        const updateDetailStepper = (status) => {
+            const step1 = document.getElementById("detail-step-1");
+            const step2 = document.getElementById("detail-step-2");
+            const step3 = document.getElementById("detail-step-3");
+            const line1 = document.getElementById("detail-line-1");
+            const line2 = document.getElementById("detail-line-2");
+            if (!step1 || !step2 || !step3 || !line1 || !line2) {
+                return;
+            }
+            step1.className = "step step-done" + (status === "New" ? " step-current" : "");
+            line1.className = "step-line" + (status === "In Review" || status === "Resolved" ? " step-line-active" : "");
+            step2.className =
+                "step" +
+                (status === "In Review" || status === "Resolved" ? " step-done" : "") +
+                (status === "In Review" ? " step-current" : "");
+            line2.className = "step-line" + (status === "Resolved" ? " step-line-active" : "");
+            step3.className =
+                "step" +
+                (status === "Resolved" ? " step-done step-current" : "");
+        };
+
+        const renderDetailResponses = (responses) => {
+            if (!responseList || !responseEmpty) {
+                return;
+            }
+            responseList.replaceChildren();
+            if (!responses.length) {
+                responseList.hidden = true;
+                responseEmpty.hidden = false;
+                return;
+            }
+            responseList.hidden = false;
+            responseEmpty.hidden = true;
+
+            responses.forEach((resp) => {
+                const card = document.createElement("div");
+                card.className = "response-item";
+
+                const meta = document.createElement("div");
+                meta.className = "response-meta";
+
+                const nameEl = document.createElement("strong");
+                nameEl.textContent = resp.rep_name;
+                meta.appendChild(nameEl);
+
+                const badge = document.createElement("span");
+                badge.className = "role-pill role-rep";
+                badge.textContent = "Class Rep";
+                meta.appendChild(badge);
+
+                const ts = document.createElement("span");
+                ts.className = "muted";
+                ts.textContent = resp.created_at;
+                meta.appendChild(ts);
+
+                const msg = document.createElement("p");
+                msg.className = "response-text";
+                msg.textContent = resp.message;
+
+                card.appendChild(meta);
+                card.appendChild(msg);
+                responseList.appendChild(card);
+            });
+        };
+
+        const syncDetailLive = async () => {
+            if (!detailPollUrl) {
+                return;
+            }
+            try {
+                const resp = await fetch(detailPollUrl, {
+                    headers: { Accept: "application/json" },
+                    cache: "no-store",
+                });
+                if (!resp.ok) {
+                    return;
+                }
+                const data = await resp.json();
+                const statusChanged = data.status !== lastStatus;
+                const repliesAdded = data.response_count > lastCount;
+
+                if (!statusChanged && !repliesAdded) {
+                    return;
+                }
+
+                document.querySelectorAll("[data-detail-status-pill]").forEach((el) => {
+                    el.className = "status-pill status-" + data.status.toLowerCase().replace(/\s+/g, "-");
+                    el.textContent = data.status;
+                });
+                document.querySelectorAll("[data-detail-updated-at]").forEach((el) => {
+                    el.textContent = data.updated_at;
+                });
+                document.querySelectorAll("[data-detail-reply-count]").forEach((el) => {
+                    el.textContent = String(data.response_count);
+                });
+
+                updateDetailStepper(data.status);
+                renderDetailResponses(Array.isArray(data.responses) ? data.responses : []);
+
+                if (data.status !== "New" && studentActions) {
+                    const lockedSpan = document.createElement("span");
+                    lockedSpan.className = "locked-banner";
+                    lockedSpan.textContent = `Locked (${data.status})`;
+                    studentActions.replaceChildren(lockedSpan);
+                    if (lockRuleText) {
+                        lockRuleText.textContent =
+                            `Editing and deletion are locked once status moves to ${data.status} so your review history stays intact.`;
+                    }
+                }
+
+                if (detailAlert && detailAlertText) {
+                    const newestReply =
+                        Array.isArray(data.responses) && data.responses.length
+                            ? data.responses[data.responses.length - 1]
+                            : null;
+                    if (repliesAdded && newestReply) {
+                        detailAlertText.textContent =
+                            `New response from ${newestReply.rep_name} (Status: ${data.status}).`;
+                    } else {
+                        detailAlertText.textContent =
+                            `Ticket status updated to ${data.status}.`;
+                    }
+                    detailAlert.hidden = false;
+                }
+
+                lastStatus = data.status;
+                lastCount = data.response_count;
+            } catch (_err) {
+                // Ignore transient network hiccups silently
+            }
+        };
+
+        window.setInterval(syncDetailLive, 2500);
+        window.addEventListener("focus", syncDetailLive);
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) {
+                syncDetailLive();
             }
         });
     }

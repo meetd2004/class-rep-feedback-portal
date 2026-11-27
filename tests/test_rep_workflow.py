@@ -88,6 +88,19 @@ def test_rep_response_and_status_progression_visible_to_author(app, client) -> N
     assert "Reported the audio echo to IT Services for re-encoding." in student_detail
     assert "Resolved" in student_detail
 
+    live_json = client.get(f"/feedback/{fid}/live").get_json()
+    assert live_json["status"] == "Resolved"
+    assert live_json["response_count"] >= 1
+    assert any(
+        r["message"] == "Reported the audio echo to IT Services for re-encoding."
+        for r in live_json["responses"]
+    )
+
+    my_feed = client.get("/student/api/my-feedback").get_json()
+    matched = [item for item in my_feed["submissions"] if item["id"] == fid][0]
+    assert matched["latest_reply"]["rep_name"] == "Niamh Gallagher"
+    assert "Reported the audio echo" in matched["latest_reply"]["message"]
+
 
 def test_xss_payloads_are_html_escaped(app, client) -> None:
     xss_title = "<script>alert('xss-title')</script>"
